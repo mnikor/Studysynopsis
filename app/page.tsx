@@ -11611,6 +11611,17 @@ export default function StudySynopsisStudio() {
           placeholder="Example: make one option more pragmatic, one more label-supportive, or challenge the comparator strategy if needed."
           className="mt-2 min-h-[88px] w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400 focus:bg-white"
         />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-600">Use this box to steer the next AI draft, then regenerate the objective options.</p>
+          <button
+            onClick={handleSuggestObjectives}
+            disabled={loadingAction !== null || !objectiveSuggestionReady}
+            className="inline-flex items-center gap-2 rounded-full bg-[#1864AB] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#155799] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-700"
+          >
+            <Sparkles className="h-4 w-4" />
+            {loadingAction === "objectives" ? "Regenerating..." : "Regenerate objective options"}
+          </button>
+        </div>
 
         {loadingAction === "objectives" && (
           <div className="mt-4">
@@ -11915,6 +11926,17 @@ export default function StudySynopsisStudio() {
           placeholder="Example: propose a lower-burden package, a more HTA-supportive package, or challenge an endpoint choice if it weakens the objective."
           className="mt-2 min-h-[88px] w-full rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400 focus:bg-white"
         />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-600">Use this box to steer the next AI draft, then regenerate the endpoint packages.</p>
+          <button
+            onClick={handleSuggestEndpoints}
+            disabled={loadingAction !== null || !endpointSuggestionReady}
+            className="inline-flex items-center gap-2 rounded-full bg-[#1864AB] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#155799] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-700"
+          >
+            <Sparkles className="h-4 w-4" />
+            {loadingAction === "endpoints" ? "Regenerating..." : "Regenerate endpoint options"}
+          </button>
+        </div>
 
         {loadingAction === "endpoints" && (
           <div className="mt-4">
