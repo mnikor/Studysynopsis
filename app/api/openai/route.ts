@@ -668,9 +668,37 @@ function deriveObjectivePrimaryEndpoint(study: z.infer<typeof studySchema>) {
   return uniqueNonEmptyItems([...study.selectedEndpoints, ...customEndpoints, ...outcomeLines])[0] || "the primary clinical outcome"
 }
 
-function buildScientificObjectivePrimary(study: z.infer<typeof studySchema>, option: z.infer<typeof objectiveSuggestionOptionSchema>) {
+function extractRequestedComparator(requestNote: string) {
+  const note = requestNote.trim()
+
+  if (!note) {
+    return ""
+  }
+
+  const patterns = [
+    /(?:make|use|set|change)\s+(?:it|the comparator|comparator)?\s*(?:to|as)?\s*([a-z0-9][a-z0-9\s+\/(),.-]{2,})\s+as comparator/i,
+    /(?:use|set|switch to|change to)\s+([a-z0-9][a-z0-9\s+\/(),.-]{2,})\s+(?:as|for the)\s+comparator/i,
+    /comparator\s*(?:should be|to|as|=)\s*([a-z0-9][a-z0-9\s+\/(),.-]{2,})/i,
+    /(?:versus|vs\.?|against)\s+([a-z0-9][a-z0-9\s+\/(),.-]{2,})/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = note.match(pattern)
+    if (match?.[1]) {
+      return match[1].trim().replace(/[.,;:]$/, "")
+    }
+  }
+
+  return ""
+}
+
+function buildScientificObjectivePrimary(
+  study: z.infer<typeof studySchema>,
+  option: z.infer<typeof objectiveSuggestionOptionSchema>,
+  requestNote = "",
+) {
   const intervention = study.topIntervention.trim() || study.intervention.trim() || "the proposed intervention"
-  const comparator = study.topComparator.trim() || study.comparator.trim() || "the relevant comparator"
+  const comparator = extractRequestedComparator(requestNote) || study.topComparator.trim() || study.comparator.trim() || "the relevant comparator"
   const disease = (study.customDisease || study.disease || "the target disease").trim()
   const setting = study.topLineOfTherapy.trim() ? ` in the ${study.topLineOfTherapy.trim()} setting` : ""
   const primaryEndpoint = deriveObjectivePrimaryEndpoint(study)
@@ -725,7 +753,9 @@ function buildScientificObjectiveSecondarys(study: z.infer<typeof studySchema>) 
 function focusObjectiveOptionPackage(
   option: z.infer<typeof objectiveSuggestionOptionSchema>,
   study: z.infer<typeof studySchema>,
+  requestNote = "",
 ) {
+  const requestedComparator = extractRequestedComparator(requestNote)
   const primaryNeedsRewrite = /market access|hta|label|guideline|practice informing|evidence package|evidence destination|positioned to|support .*decision|credible for/i.test(
     option.primaryObjective,
   )
@@ -741,7 +771,10 @@ function focusObjectiveOptionPackage(
 
   return {
     ...option,
-    primaryObjective: primaryNeedsRewrite ? buildScientificObjectivePrimary(study, option) : option.primaryObjective.trim(),
+    primaryObjective:
+      primaryNeedsRewrite || Boolean(requestedComparator)
+        ? buildScientificObjectivePrimary(study, option, requestNote)
+        : option.primaryObjective.trim(),
     secondaryObjectives: mergedSecondarys,
   }
 }
@@ -1040,7 +1073,7 @@ export async function POST(request: Request) {
 
       return Response.json({
         ...result,
-        options: result.options.map((option) => focusObjectiveOptionPackage(option, body.study)),
+        options: result.options.map((option) => focusObjectiveOptionPackage(option, body.study, body.requestNote || "")),
       })
     }
 

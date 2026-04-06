@@ -2561,6 +2561,8 @@ function buildObjectiveAlignment(study: StudyForm, draft: ObjectiveSuggestionDra
   const evidenceIntent = getPrimaryEvidenceUseIntent(study).toLowerCase()
   const disease = getSelectedDiseaseLabel(study).toLowerCase()
   const intervention = ((study.topIntervention || "").trim() || study.intervention || "").toLowerCase()
+  const currentComparator = ((study.topComparator || "").trim() || study.comparator || "").trim()
+  const requestedComparator = extractRequestedComparator(requestNote)
   const concerns: string[] = []
   const recommendations: string[] = []
   let status: SuggestionAlignmentStatus = "aligned"
@@ -2622,6 +2624,26 @@ function buildObjectiveAlignment(study: StudyForm, draft: ObjectiveSuggestionDra
     recommendations.push("Keep at least one clinically decision-relevant objective and move biomarker emphasis into secondary or exploratory objectives.")
   }
 
+  if (
+    requestedComparator &&
+    currentComparator &&
+    normalizeOptionText(requestedComparator) !== normalizeOptionText(currentComparator) &&
+    text.includes(requestedComparator.toLowerCase())
+  ) {
+    status = elevateAlignmentStatus(status, "partially_aligned")
+    concerns.push(`The option reflects the requested comparator ${requestedComparator}, but the saved study comparator is still ${currentComparator}.`)
+    recommendations.push("Update the Comparator field as well if you want the whole workflow to use the new comparator consistently.")
+  } else if (
+    requestedComparator &&
+    currentComparator &&
+    normalizeOptionText(requestedComparator) !== normalizeOptionText(currentComparator) &&
+    !text.includes(requestedComparator.toLowerCase())
+  ) {
+    status = elevateAlignmentStatus(status, "partially_aligned")
+    concerns.push(`The requested comparator shift to ${requestedComparator} was not carried through clearly into the regenerated objective package.`)
+    recommendations.push("Regenerate again or update the Comparator field directly before asking AI to draft the objective package.")
+  }
+
   return {
     status,
     summary:
@@ -2635,6 +2657,30 @@ function buildObjectiveAlignment(study: StudyForm, draft: ObjectiveSuggestionDra
   }
 }
 
+function extractRequestedComparator(requestNote: string) {
+  const note = requestNote.trim()
+
+  if (!note) {
+    return ""
+  }
+
+  const patterns = [
+    /(?:make|use|set|change)\s+(?:it|the comparator|comparator)?\s*(?:to|as)?\s*([a-z0-9][a-z0-9\s+\/(),.-]{2,})\s+as comparator/i,
+    /(?:use|set|switch to|change to)\s+([a-z0-9][a-z0-9\s+\/(),.-]{2,})\s+(?:as|for the)\s+comparator/i,
+    /comparator\s*(?:should be|to|as|=)\s*([a-z0-9][a-z0-9\s+\/(),.-]{2,})/i,
+    /(?:versus|vs\.?|against)\s+([a-z0-9][a-z0-9\s+\/(),.-]{2,})/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = note.match(pattern)
+    if (match?.[1]) {
+      return match[1].trim().replace(/[.,;:]$/, "")
+    }
+  }
+
+  return ""
+}
+
 function buildObjectiveSuggestionOptionsFromStudy(
   study: StudyForm,
   requestNote = "",
@@ -2646,7 +2692,8 @@ function buildObjectiveSuggestionOptionsFromStudy(
   const endpoints = getAllChosenEndpoints(study)
   const primaryEndpoint = endpoints[0] || "the primary clinical outcome"
   const intervention = (study.topIntervention || "").trim() || study.intervention || "the proposed intervention"
-  const comparator = (study.topComparator || "").trim() || study.comparator || "the relevant comparator"
+  const requestedComparator = extractRequestedComparator(requestNote)
+  const comparator = requestedComparator || (study.topComparator || "").trim() || study.comparator || "the relevant comparator"
   const lineOfTherapy = (study.topLineOfTherapy || "").trim()
   const settingText = lineOfTherapy ? ` in the ${lineOfTherapy} setting` : ""
   const requestSentence = requestNote.trim() ? ` Requested shift: ${requestNote.trim()}.` : ""
@@ -9678,18 +9725,12 @@ export default function StudySynopsisStudio() {
                 </div>
               )}
 
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                 <Field
                   label="Study title"
                   value={study.studyTitle}
                   onChange={(value) => updateStudy("studyTitle", value)}
                   placeholder="Phase III Synopsis for XYZ in metastatic NSCLC"
-                />
-                <Field
-                  label="Sponsor or program"
-                  value={study.sponsor}
-                  onChange={(value) => updateStudy("sponsor", value)}
-                  placeholder="Clinical Development Oncology"
                 />
 
                 <label className="space-y-2">
