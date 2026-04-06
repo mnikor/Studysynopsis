@@ -2650,36 +2650,45 @@ function buildObjectiveSuggestionOptionsFromStudy(
   const lineOfTherapy = (study.topLineOfTherapy || "").trim()
   const settingText = lineOfTherapy ? ` in the ${lineOfTherapy} setting` : ""
   const requestSentence = requestNote.trim() ? ` Requested shift: ${requestNote.trim()}.` : ""
+  const htaOrAccessIntent = /market access|hta/i.test(`${strategicObjective} ${evidenceIntent}`)
+  const practiceIntent = /guideline|practice|inform clinical practice/i.test(`${strategicObjective} ${evidenceIntent}`)
+  const labelIntent = /label|regulatory/i.test(evidenceIntent)
+  const focusedSecondaryObjectives = uniqueItemsCaseInsensitive(
+    [
+      `Characterize safety and tolerability of ${intervention}.`,
+      htaOrAccessIntent ? "Assess health-related quality of life or symptom burden with patient-reported outcomes." : "",
+      htaOrAccessIntent ? "Assess healthcare resource utilization or treatment-pattern consequences relevant to payer decisions." : "",
+      practiceIntent ? "Assess clinically meaningful and patient-relevant supportive outcomes that strengthen routine-practice interpretation." : "",
+      labelIntent ? `Assess key supportive outcomes that strengthen interpretability of ${primaryEndpoint.toLowerCase()}.` : "",
+      /dose modification/i.test(strategicObjective)
+        ? `Assess dose intensity, treatment modification, and tolerability support for ${intervention}.`
+        : `Assess decision-relevant subgroup findings for ${intervention}.`,
+    ].filter(Boolean),
+  )
 
   const balanced: ObjectiveSuggestionDraft = {
     label: "Balanced evidence option",
     positioning: "Closest fit to the current study inputs and strategic objective.",
-    primaryObjective: `Evaluate whether ${intervention} can ${strategicObjective.toLowerCase()} in ${disease}${settingText} compared with ${comparator} by assessing ${primaryEndpoint}, with the evidence package shaped for ${evidenceIntent.toLowerCase()}.`,
+    primaryObjective: `Evaluate the comparative clinical effectiveness of ${intervention} versus ${comparator} in ${disease}${settingText} by assessing ${primaryEndpoint}.`,
     secondaryObjectives: uniqueItemsCaseInsensitive(
-      endpoints.slice(1, 4).map((endpoint) => `Assess ${endpoint.toLowerCase()} as a key supporting outcome.`).concat([
-        `Characterize safety and tolerability of ${intervention}.`,
-        `Assess decision-relevant subgroup findings for ${intervention}.`,
-        /label|hta|guideline|practice/i.test(evidenceIntent)
-          ? `Preserve objective framing that is credible for ${evidenceIntent.toLowerCase()} at ${developmentStage}.`
-          : `Keep the objective package aligned to the chosen evidence destination at ${developmentStage}.`,
-      ]),
+      endpoints.slice(1, 4).map((endpoint) => `Assess ${endpoint.toLowerCase()} as a key supporting outcome.`).concat(focusedSecondaryObjectives),
     ),
     designOverview:
       study.designOverview ||
-      `Draft a ${study.subcategory || study.category || "fit-for-purpose"} design in ${disease}${settingText} aligned to the strategic objective of ${strategicObjective.toLowerCase()} and the evidence destination of ${evidenceIntent.toLowerCase()} at ${developmentStage}, evaluating ${intervention} against ${comparator}.${requestSentence}`,
+      `Draft a ${study.subcategory || study.category || "fit-for-purpose"} comparative design in ${disease}${settingText} at ${developmentStage}, evaluating ${intervention} against ${comparator} with an assessment package suited to ${evidenceIntent.toLowerCase()}.${requestSentence}`,
     alignment: emptySuggestionAlignment,
   }
 
   const pragmatic: ObjectiveSuggestionDraft = {
     label: "Pragmatic feasibility option",
     positioning: "Lower-burden framing to support execution and operational realism.",
-    primaryObjective: `Assess whether ${intervention} can generate decision-grade evidence in ${disease}${settingText} with an operationally feasible comparison against ${comparator}, centered on ${primaryEndpoint}, while remaining realistic for ${evidenceIntent.toLowerCase()}.`,
+    primaryObjective: `Estimate the comparative effect of ${intervention} versus ${comparator} in ${disease}${settingText} using ${primaryEndpoint} within an operationally feasible study design.`,
     secondaryObjectives: uniqueItemsCaseInsensitive([
       `Characterize safety and tolerability of ${intervention} in the intended care setting.`,
-      `Assess treatment persistence, protocol feasibility, and clinically interpretable supporting outcomes.`,
-      /market access|hta|inform clinical practice/i.test(strategicObjective)
-        ? "Support practice-relevant interpretation through patient-centered and utilization-relevant secondary evidence."
-        : "Support interpretation through patient-centered and clinically meaningful secondary evidence.",
+      htaOrAccessIntent
+        ? "Assess one patient-centered and one utilization-relevant supportive outcome without over-expanding the assessment burden."
+        : "Assess clinically meaningful supportive outcomes without over-expanding the assessment burden.",
+      "Assess treatment persistence, feasibility, and other supportive outcomes needed to interpret the primary result.",
     ]),
     designOverview: `Use a ${study.subcategory || study.category || "fit-for-purpose"} design in ${disease}${settingText} that preserves the comparator logic while keeping the assessment package realistic for execution and still useful for ${evidenceIntent.toLowerCase()} at ${developmentStage}.${requestSentence}`,
     alignment: emptySuggestionAlignment,
@@ -2690,13 +2699,15 @@ function buildObjectiveSuggestionOptionsFromStudy(
     positioning: requestNote.trim()
       ? `Shaped around the requested direction: ${requestNote.trim()}`
       : "More ambitious framing for differentiation, label support, or strategic visibility.",
-    primaryObjective: `Demonstrate the comparative clinical value of ${intervention} in ${disease}${settingText} versus ${comparator}, with the objective package positioned to ${strategicObjective.toLowerCase()} and support ${evidenceIntent.toLowerCase()} through ${primaryEndpoint}.`,
+    primaryObjective: `Demonstrate superior or differentiated clinical benefit of ${intervention} versus ${comparator} in ${disease}${settingText} through ${primaryEndpoint}.`,
     secondaryObjectives: uniqueItemsCaseInsensitive([
       `Quantify the breadth and durability of benefit beyond ${primaryEndpoint.toLowerCase()}.`,
-      `Strengthen the evidence package with safety, subgroup, and interpretability-supporting outcomes for ${intervention}.`,
+      htaOrAccessIntent
+        ? "Strengthen interpretation with patient-reported, safety, and utilization-relevant supportive outcomes."
+        : `Strengthen interpretation with safety and clinically meaningful supportive outcomes for ${intervention}.`,
       /dose modification/i.test(strategicObjective)
         ? `Assess dose intensity, tolerability, and exposure-response support for ${intervention}.`
-        : `Support downstream differentiation and stakeholder relevance for ${intervention}.`,
+        : `Assess subgroup consistency and other supportive evidence relevant to ${intervention}.`,
     ]),
     designOverview: `Position the study as a ${study.subcategory || study.category || "fit-for-purpose"} comparative evidence package in ${disease}${settingText}, retaining coherence with the current intervention, comparator, strategic intent, and the declared evidence destination at ${developmentStage}.${requestSentence}`,
     alignment: emptySuggestionAlignment,
@@ -7014,7 +7025,6 @@ export default function StudySynopsisStudio() {
   const [openAiAssistantModal, setOpenAiAssistantModal] = useState<AiAssistantModalKind | null>(null)
   const [populationSuggestionSource, setPopulationSuggestionSource] = useState<PopulationSuggestionSource>("population")
   const [studyTypeReviewNotice, setStudyTypeReviewNotice] = useState<StudyTypeReviewNotice | null>(null)
-  const [showGuidedEndpointSeeds, setShowGuidedEndpointSeeds] = useState(true)
 
   const clearScheduleInsights = () => {
     setScheduleInsights(initialScheduleInsights)
@@ -7074,7 +7084,6 @@ export default function StudySynopsisStudio() {
     setOperationalNoteItemDraft("")
     setIsCustomStrategicObjective(Boolean(normalized.study.customStrategicObjective.trim()))
     setIsCustomDisease(Boolean(normalized.study.customDisease.trim()))
-    setShowGuidedEndpointSeeds(!(normalized.study.outcomes || "").trim() && !(normalized.study.selectedEndpoints || []).length)
     setStudyTypeReviewNotice(null)
     setOpenHelpTab(null)
     setOpenAiAssistantModal(null)
@@ -7369,7 +7378,6 @@ export default function StudySynopsisStudio() {
   const currentProjectName = currentProjectMeta?.name || normalizeProjectName(projectNameDraft, "New synopsis")
   const selectedEvidenceUseIntents = Array.isArray(study.secondaryEvidenceUseIntents) ? study.secondaryEvidenceUseIntents : []
   const selectedStrategicObjectives = Array.isArray(study.secondaryStrategicObjectives) ? study.secondaryStrategicObjectives : []
-  const selectedStudyEndpoints = Array.isArray(study.selectedEndpoints) ? study.selectedEndpoints : []
   const primaryIntentAlignment = buildPrimaryIntentAlignment(study)
   const objectiveSuggestionReady = objectiveSuggestionMissing.length === 0
   const endpointSuggestionReady = endpointSuggestionMissing.length === 0
@@ -8349,7 +8357,6 @@ export default function StudySynopsisStudio() {
             : current.developmentStage
           : "Not phase-based",
     }))
-    setShowGuidedEndpointSeeds(true)
     setStudyTypeReviewNotice(buildStudyTypeReviewNotice("category", category, firstSubcategory))
     clearAiProposalDrafts()
     clearSampleSizeEstimate()
@@ -8384,7 +8391,6 @@ export default function StudySynopsisStudio() {
           ? ""
           : current.outcomes,
     }))
-    setShowGuidedEndpointSeeds(true)
     clearAiProposalDrafts()
     clearSampleSizeEstimate()
     clearImpactAssessment()
@@ -8511,7 +8517,6 @@ export default function StudySynopsisStudio() {
           ? ""
           : current.outcomes,
     }))
-    setShowGuidedEndpointSeeds(true)
     clearAiProposalDrafts()
     clearSampleSizeEstimate()
     clearImpactAssessment()
@@ -8595,46 +8600,6 @@ export default function StudySynopsisStudio() {
     const nextItems = [...items, { id: createStructuredEditorItemId(), text: nextValue, active: true }]
     commitStructuredStudyField(key, nextItems, setItems)
     clearDraft()
-  }
-
-  const applyStructuredSelections = () => {
-    const diseaseLabel = getSelectedDiseaseLabel(study)
-    const endpoints = getAllChosenEndpoints(study)
-
-    setStudy((current) => ({
-      ...(() => {
-        const currentOutcomeItems = splitStructuredEditorItems(current.outcomes || "")
-        const mergedOutcomeItems = uniqueItemsCaseInsensitive([...currentOutcomeItems, ...endpoints])
-        const nextOutcomeText = mergedOutcomeItems.length ? mergedOutcomeItems.join("\n") : current.outcomes
-        const derivedEndpointState = deriveEndpointStateFromOutcomeText(current, nextOutcomeText)
-
-        return {
-          indication: diseaseLabel || current.indication,
-          selectedEndpoints: uniqueItemsCaseInsensitive([
-            ...derivedEndpointState.selectedEndpoints,
-            ...(current.selectedEndpoints || []),
-            ...endpoints.filter((endpoint) =>
-              getGuidedEndpointsForStudy(current).some((guidedEndpoint) => valuesMatch(guidedEndpoint, endpoint)),
-            ),
-          ]),
-          customEndpoints: derivedEndpointState.customEndpoints,
-          outcomes: nextOutcomeText,
-        }
-      })(),
-    }))
-    setShowGuidedEndpointSeeds(false)
-    clearAiProposalDrafts()
-    clearSampleSizeEstimate()
-    clearImpactAssessment()
-    setFinalSections([])
-    setApiNotice("")
-    setReviews((current) => ({
-      ...current,
-      study: { ...current.study, status: "pending", reviewedAt: "" },
-      pico: { ...current.pico, status: "pending", reviewedAt: "" },
-      literature: { ...current.literature, status: "pending", reviewedAt: "" },
-      schedule: { ...current.schedule, status: "pending", reviewedAt: "" },
-    }))
   }
 
   const handleSuggestObjectives = async () => {
@@ -8864,7 +8829,6 @@ export default function StudySynopsisStudio() {
         }
       })(),
     }))
-    setShowGuidedEndpointSeeds(false)
     clearAiProposalDrafts()
     clearSampleSizeEstimate()
     clearImpactAssessment()
@@ -10104,9 +10068,7 @@ export default function StudySynopsisStudio() {
                           ))}
                           <option value="__custom__">Custom...</option>
                         </select>
-                        <p className="text-xs leading-6 text-slate-500">
-                          This guided list links disease selection to endpoint suggestions.
-                        </p>
+                        <p className="text-xs leading-6 text-slate-500">This guided list helps tailor downstream AI suggestions and synopsis wording.</p>
                       </>
                     )}
                   </label>
@@ -10139,64 +10101,6 @@ export default function StudySynopsisStudio() {
                   />
                 </div>
 
-                <div className="mt-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-700">Guided endpoint seeds</p>
-                      <p className="mt-1 text-xs leading-6 text-slate-500">
-                        Use this to seed the endpoint package quickly. The detailed Endpoints and assessments editor below is the main working area.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => setShowGuidedEndpointSeeds((current) => !current)}
-                        className="rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                      >
-                        {showGuidedEndpointSeeds ? "Hide seeds" : "Show seeds"}
-                      </button>
-                      <button
-                        onClick={applyStructuredSelections}
-                        className="rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
-                      >
-                        Use selected disease and endpoints
-                      </button>
-                    </div>
-                  </div>
-                  {showGuidedEndpointSeeds ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {suggestedEndpoints.length > 0 ? (
-                        suggestedEndpoints.map((endpoint) => (
-                          <label
-                            key={endpoint}
-                            className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium ${
-                              selectedStudyEndpoints.includes(endpoint)
-                                ? "border-slate-900 bg-slate-950 text-white"
-                                : "border-slate-200 bg-white text-slate-700"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedStudyEndpoints.includes(endpoint)}
-                              onChange={() => toggleStudyArrayField("selectedEndpoints", endpoint)}
-                              className="h-4 w-4 rounded border-slate-300"
-                            />
-                            {endpoint}
-                          </label>
-                        ))
-                      ) : (
-                        <p className="text-sm text-slate-600">
-                          Choose a therapeutic area and disease to load guided endpoints. Add any non-standard endpoint later in the focused Endpoints and assessments editor.
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-sm text-slate-600">
-                      {selectedStudyEndpoints.length > 0
-                        ? `${selectedStudyEndpoints.length} guided endpoint seed${selectedStudyEndpoints.length === 1 ? "" : "s"} selected. Fine-tune the real endpoint wording below.`
-                        : "Guided endpoint seeds are hidden. The detailed endpoint editor below remains the main endpoint workspace."}
-                    </p>
-                  )}
-                </div>
               </div>
 
               <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5">

@@ -643,13 +643,107 @@ function objectiveSuggestionPrompt() {
   return [
     "You are a senior clinical strategist and medical writer.",
     "Use the study's development stage, strategic objective, evidence use intent, therapeutic area, disease, intervention, comparator, line of therapy or setting, suggested endpoints, study type, and optional requestNote to propose synopsis-ready research objectives.",
+    "Research objectives must remain scientific and testable. Do not write objectives as 'support HTA', 'support market access', 'support label change', or any other strategic-program phrasing.",
+    "Use strategic objective and evidence use intent to shape comparator rigor, patient-centered support, utilization support, and design framing, not to replace the scientific question being tested.",
     "Return exactly 3 differentiated option packages: one balanced, one pragmatic or feasibility-oriented, and one assertive or request-shaped alternative.",
     "Each option must include label, positioning, one strong primary objective, a concise array of 2 to 4 secondary objectives, a draft design overview, and an alignment assessment.",
     "If requestNote conflicts with the current study context, do not comply blindly. Mark the option as partially_aligned or conflicts, explain the issue clearly, and suggest safer alternatives.",
     "Make the objective package proportionate to the declared evidence destination. Label or HTA intent usually requires stricter comparator and endpoint discipline than practice-informing or publication-only intent.",
+    "For HTA or market-access intent, keep the primary objective focused on comparative clinical or patient-relevant effectiveness. Put quality-of-life, utilization, and stakeholder-relevant support into the secondary objectives and design overview when justified.",
     "Ensure at least one option remains aligned to the current study context when feasible.",
     "Keep the text operationally useful and scientifically credible.",
   ].join("\n")
+}
+
+function deriveObjectivePrimaryEndpoint(study: z.infer<typeof studySchema>) {
+  const customEndpoints = study.customEndpoints
+    .split(/\n|;/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const outcomeLines = study.outcomes
+    .split(/\n|;/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  return uniqueNonEmptyItems([...study.selectedEndpoints, ...customEndpoints, ...outcomeLines])[0] || "the primary clinical outcome"
+}
+
+function buildScientificObjectivePrimary(study: z.infer<typeof studySchema>, option: z.infer<typeof objectiveSuggestionOptionSchema>) {
+  const intervention = study.topIntervention.trim() || study.intervention.trim() || "the proposed intervention"
+  const comparator = study.topComparator.trim() || study.comparator.trim() || "the relevant comparator"
+  const disease = (study.customDisease || study.disease || "the target disease").trim()
+  const setting = study.topLineOfTherapy.trim() ? ` in the ${study.topLineOfTherapy.trim()} setting` : ""
+  const primaryEndpoint = deriveObjectivePrimaryEndpoint(study)
+  const evidenceIntent = study.primaryEvidenceUseIntent.toLowerCase()
+  const objectiveText = option.primaryObjective.toLowerCase()
+
+  if (/quality of life|patient-reported|symptom/.test(objectiveText)) {
+    return `Evaluate whether ${intervention} improves patient-reported or symptom outcomes versus ${comparator} in ${disease}${setting}.`
+  }
+
+  if (/response|remission|control rate|objective response/.test(objectiveText)) {
+    return `Evaluate whether ${intervention} improves response-based disease control versus ${comparator} in ${disease}${setting} by assessing ${primaryEndpoint}.`
+  }
+
+  if (/survival|mortality/.test(objectiveText)) {
+    return `Evaluate whether ${intervention} improves survival outcomes versus ${comparator} in ${disease}${setting} by assessing ${primaryEndpoint}.`
+  }
+
+  if (/progression|event[- ]?free|disease[- ]?free|relapse/.test(objectiveText) || /hta|market access/.test(evidenceIntent)) {
+    return `Evaluate the comparative clinical effectiveness of ${intervention} versus ${comparator} in ${disease}${setting} by assessing ${primaryEndpoint}.`
+  }
+
+  return `Evaluate the clinical effect of ${intervention} versus ${comparator} in ${disease}${setting} by assessing ${primaryEndpoint}.`
+}
+
+function buildScientificObjectiveSecondarys(study: z.infer<typeof studySchema>) {
+  const intervention = study.topIntervention.trim() || study.intervention.trim() || "the intervention"
+  const strategicObjective = `${study.primaryStrategicObjective} ${study.customStrategicObjective}`.toLowerCase()
+  const evidenceIntent = `${study.primaryEvidenceUseIntent} ${study.secondaryEvidenceUseIntents.join(" ")}`.toLowerCase()
+  const secondarys = [`Characterize safety and tolerability of ${intervention}.`]
+
+  if (/hta|market access/.test(evidenceIntent)) {
+    secondarys.push("Assess health-related quality of life or symptom burden with patient-reported outcomes.")
+    secondarys.push("Assess healthcare resource utilization or treatment-pattern consequences that could inform payer decisions.")
+  } else if (/guideline|practice/.test(evidenceIntent)) {
+    secondarys.push("Assess clinically interpretable and patient-relevant supportive outcomes.")
+    secondarys.push("Assess durability of benefit in a way that supports routine-practice interpretation.")
+  } else if (/label|regulatory/.test(evidenceIntent)) {
+    secondarys.push("Assess key supportive endpoints that strengthen interpretability of the primary result.")
+    secondarys.push("Assess durability of benefit and other claim-relevant supportive outcomes.")
+  } else {
+    secondarys.push("Assess clinically meaningful supportive outcomes that strengthen interpretation of the primary result.")
+  }
+
+  if (/dose modification|dose optimization/.test(strategicObjective)) {
+    secondarys.push(`Assess dose intensity, treatment modifications, and tolerability support for ${intervention}.`)
+  }
+
+  return uniqueNonEmptyItems(secondarys).slice(0, 4)
+}
+
+function focusObjectiveOptionPackage(
+  option: z.infer<typeof objectiveSuggestionOptionSchema>,
+  study: z.infer<typeof studySchema>,
+) {
+  const primaryNeedsRewrite = /market access|hta|label|guideline|practice informing|evidence package|evidence destination|positioned to|support .*decision|credible for/i.test(
+    option.primaryObjective,
+  )
+  const filteredSecondarys = uniqueNonEmptyItems(
+    option.secondaryObjectives.filter(
+      (item) =>
+        !/preserve objective framing|keep the objective package aligned|support downstream differentiation|support stakeholder relevance|credible for .*hta|credible for .*label|evidence destination|positioned to/i.test(
+          item,
+        ),
+    ),
+  )
+  const mergedSecondarys = uniqueNonEmptyItems([...filteredSecondarys, ...buildScientificObjectiveSecondarys(study)]).slice(0, 4)
+
+  return {
+    ...option,
+    primaryObjective: primaryNeedsRewrite ? buildScientificObjectivePrimary(study, option) : option.primaryObjective.trim(),
+    secondaryObjectives: mergedSecondarys,
+  }
 }
 
 function endpointSuggestionPrompt() {
@@ -944,7 +1038,10 @@ export async function POST(request: Request) {
         maxOutputTokens: 9000,
       })
 
-      return Response.json(result)
+      return Response.json({
+        ...result,
+        options: result.options.map((option) => focusObjectiveOptionPackage(option, body.study)),
+      })
     }
 
     if (body.action === "suggest_endpoints") {
