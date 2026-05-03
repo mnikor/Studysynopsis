@@ -23,6 +23,19 @@ import {
   X,
 } from "lucide-react"
 
+declare global {
+  interface Window {
+    __STUDY_SYNOPSIS_API_BASE_URL__?: string
+  }
+}
+
+function apiUrl(path: string) {
+  const baseUrl =
+    typeof window !== "undefined" ? (window.__STUDY_SYNOPSIS_API_BASE_URL__ || "").replace(/\/$/, "") : ""
+
+  return `${baseUrl}${path}`
+}
+
 const TABS = [
   { id: "study", label: "Study Design", icon: Microscope },
   { id: "schema", label: "Study Schema", icon: GitBranch },
@@ -201,6 +214,60 @@ const PRIMARY_STUDY_AIMS = [
   },
 ] as const
 
+type ProtocolGuardrailProfile =
+  | "auto"
+  | "none"
+  | "practice_informing_ped"
+  | "lean_decision_evidence"
+
+type Phase3SafetyAvailability = "" | "yes" | "no" | "unknown"
+
+type ProtocolGuardrailCheckStatus = "aligned" | "needs_justification" | "consider_simplifying"
+
+type ProtocolGuardrailCheck = {
+  id: string
+  label: string
+  status: ProtocolGuardrailCheckStatus
+  finding: string
+  action: string
+}
+
+type ProtocolGuardrailAssessment = {
+  profile: Exclude<ProtocolGuardrailProfile, "auto">
+  label: string
+  summary: string
+  checks: ProtocolGuardrailCheck[]
+}
+
+const PROTOCOL_GUARDRAIL_OPTIONS: Array<{ value: ProtocolGuardrailProfile; label: string; description: string }> = [
+  {
+    value: "auto",
+    label: "Auto-suggest",
+    description: "Use the study type, stage, and primary aim to decide whether guardrails should apply.",
+  },
+  {
+    value: "none",
+    label: "No protocol guardrails",
+    description: "Use standard synopsis drafting without additional protocol-template discipline.",
+  },
+  {
+    value: "practice_informing_ped",
+    label: "Practice-informing PED guardrails",
+    description: "Lean interventional discipline for studies intended to inform clinical practice or guidelines.",
+  },
+  {
+    value: "lean_decision_evidence",
+    label: "Lean decision-evidence guardrails",
+    description: "A lighter profile for HTA, market-access, publication, or pragmatic evidence generation.",
+  },
+]
+
+const PROTOCOL_GUARDRAIL_LABELS: Record<Exclude<ProtocolGuardrailProfile, "auto">, string> = {
+  none: "No protocol guardrails",
+  practice_informing_ped: "Practice-informing PED guardrails",
+  lean_decision_evidence: "Lean decision-evidence guardrails",
+}
+
 const THERAPEUTIC_LIBRARY = {
   Oncology: {
     diseases: {
@@ -335,6 +402,9 @@ type StudyForm = {
   subcategory: string
   developmentStage: string
   primaryStudyAim: string
+  protocolGuardrailProfile: ProtocolGuardrailProfile
+  phase3SafetyDataAvailable: Phase3SafetyAvailability
+  protocolGuardrailNotes: string
   primaryEvidenceUseIntent: string
   secondaryEvidenceUseIntents: string[]
   primaryStrategicObjective: string
@@ -371,6 +441,7 @@ type PicoForm = {
   outcomes: string
   timeframe: string
   prompt: string
+  sourceFingerprint: string
 }
 
 type StatsForm = {
@@ -386,6 +457,7 @@ type StatsForm = {
   missingData: string
   rationale: string
   prompt: string
+  sourceFingerprint: string
 }
 
 type LiteratureForm = {
@@ -400,6 +472,7 @@ type LiteratureForm = {
   greyLiteraturePlan: string
   backgroundThemes: string
   prompt: string
+  sourceFingerprint: string
 }
 
 type ScheduleColumn = {
@@ -420,17 +493,20 @@ type ScheduleRow = {
 
 type ScheduleProvenance = "empty" | "ai_generated" | "local_draft" | "manual" | "hybrid"
 type ScheduleTableLayout = "auto" | "single" | "split"
+type ScheduleStructureMode = "auto" | "common" | "conditional" | "separate_by_arm" | "dosing_plus_common"
 
 type ScheduleForm = {
   purpose: string
   prompt: string
   iterationPrompt: string
   tableLayout: ScheduleTableLayout
+  structureMode: ScheduleStructureMode
   columns: ScheduleColumn[]
   rows: ScheduleRow[]
   generatedAt: string
   provenance: ScheduleProvenance
   manualEdited: boolean
+  sourceFingerprint: string
 }
 
 type AnalysisImpact = "low" | "medium" | "high"
@@ -473,9 +549,11 @@ type ScheduleTradeoffAssessment = {
 }
 
 type ScheduleInsightsProvenance = "empty" | "ai_generated" | "local_draft"
+type ScheduleInsightMode = "complexity" | "tradeoff"
 
 type ScheduleInsights = {
   focus: string
+  mode: ScheduleInsightMode | ""
   generatedAt: string
   provenance: ScheduleInsightsProvenance
   complexity: ScheduleComplexityAssessment
@@ -484,6 +562,27 @@ type ScheduleInsights = {
 
 type StudySchemaOrientation = "horizontal" | "vertical"
 type StudySchemaDetailLevel = "simple" | "standard" | "detailed"
+type StudySchemaUseCase = "executive_slide" | "protocol_overview" | "internal_review"
+type StudySchemaDesignPattern =
+  | "auto"
+  | "parallel_group"
+  | "single_arm"
+  | "cohort_rwe"
+  | "platform_master_protocol"
+  | "adaptive"
+  | "crossover"
+  | "substudy_enabled"
+  | "evidence_synthesis"
+  | "non_clinical"
+type StudySchemaContentBlock =
+  | "objectives"
+  | "endpoints"
+  | "population"
+  | "eligibility"
+  | "timeline"
+  | "comparator"
+  | "decision_use"
+  | "design"
 type StudySchemaNodeKind =
   | "start"
   | "screening"
@@ -531,11 +630,19 @@ type StudySchemaTheme = {
 
 type StudySchemaProvenance = "empty" | "ai_generated" | "local_draft" | "manual" | "hybrid"
 
+type WorkflowOptions = {
+  useLiterature: boolean
+  useSchedule: boolean
+}
+
 type StudySchemaForm = {
   title: string
   schemaType: string
+  designPattern: StudySchemaDesignPattern
   orientation: StudySchemaOrientation
   detailLevel: StudySchemaDetailLevel
+  useCase: StudySchemaUseCase
+  contentBlocks: StudySchemaContentBlock[]
   iterationPrompt: string
   lanes: StudySchemaLane[]
   nodes: StudySchemaNode[]
@@ -550,6 +657,7 @@ type StudySchemaForm = {
 
 type WorkspaceSnapshot = {
   activeTab: TabId
+  workflowOptions: WorkflowOptions
   study: StudyForm
   studySchema: StudySchemaForm
   pico: PicoForm
@@ -596,6 +704,7 @@ type SynopsisSection = {
   sourceTabs: string[]
   assumptionFlags: string[]
   lastGeneratedAt: string
+  sourceFingerprint: string
   promptVersion: number
   manualEdited: boolean
 }
@@ -604,6 +713,7 @@ type FinalSection = {
   id: string
   title: string
   body: string
+  sourceFingerprint?: string
 }
 
 type ReviewStatus = "pending" | "approved" | "needs_revision"
@@ -638,16 +748,24 @@ type SampleSizeSuggestion = {
 type SampleSizeEstimate = {
   status: "idle" | "needs_inputs" | "ready" | "error"
   generatedAt: string
-  methodKey: "continuous" | "binary" | "time_to_event" | "generic"
+  methodKey: "continuous" | "binary" | "binary_non_inferiority" | "time_to_event" | "generic"
   methodLabel: string
+  reliabilityLabel: string
+  formula: string
   summary: string
   missing: string[]
   assumptions: string[]
+  auditTrail: string[]
+  warnings: string[]
   notes: string[]
   estimatedPerArm: number
+  estimatedControlArm: number
+  estimatedTreatmentArm: number
   estimatedTotal: number
   adjustedTotal: number
   attritionRate: number
+  allocationRatio: number
+  nonInferiorityMargin: number | null
   plannedTotal: number | null
   plannedGap: number | null
   plannedStatus: "under" | "aligned" | "over" | "unknown"
@@ -762,6 +880,9 @@ const initialStudyForm: StudyForm = {
   subcategory: "Traditional RCT",
   developmentStage: "",
   primaryStudyAim: "",
+  protocolGuardrailProfile: "auto",
+  phase3SafetyDataAvailable: "",
+  protocolGuardrailNotes: "",
   primaryEvidenceUseIntent: "",
   secondaryEvidenceUseIntents: [],
   primaryStrategicObjective: "",
@@ -798,6 +919,7 @@ const initialPicoForm: PicoForm = {
   outcomes: "",
   timeframe: "",
   prompt: "",
+  sourceFingerprint: "",
 }
 
 const initialStatsForm: StatsForm = {
@@ -813,6 +935,7 @@ const initialStatsForm: StatsForm = {
   missingData: "",
   rationale: "",
   prompt: "",
+  sourceFingerprint: "",
 }
 
 const initialLiteratureForm: LiteratureForm = {
@@ -827,22 +950,98 @@ const initialLiteratureForm: LiteratureForm = {
   greyLiteraturePlan: "",
   backgroundThemes: "",
   prompt: "",
+  sourceFingerprint: "",
 }
 
-const DEFAULT_STUDY_SCHEMA_THEME: StudySchemaTheme = {
-  background: "#F8FBFF",
-  laneFill: "#E7F5FF",
+const J_AND_J_STUDY_SCHEMA_THEME: StudySchemaTheme = {
+  background: "#FFF7F7",
+  laneFill: "#FDECEC",
   nodeFill: "#FFFFFF",
-  accent: "#1864AB",
-  text: "#1F2937",
-  edge: "#5C7CFA",
+  accent: "#D71920",
+  text: "#242424",
+  edge: "#8A1538",
 }
+
+const DEFAULT_STUDY_SCHEMA_THEME: StudySchemaTheme = J_AND_J_STUDY_SCHEMA_THEME
+
+const STUDY_SCHEMA_CONTENT_OPTIONS: Array<{ id: StudySchemaContentBlock; label: string; description: string }> = [
+  { id: "objectives", label: "Objectives", description: "Primary and selected secondary objectives." },
+  { id: "endpoints", label: "Endpoints", description: "Primary endpoint and focused readouts." },
+  { id: "population", label: "Population", description: "Target population or evidence source." },
+  { id: "eligibility", label: "Eligibility", description: "Key inclusion and exclusion highlights." },
+  { id: "timeline", label: "Timeline", description: "Enrollment and follow-up shown as horizontal arrows." },
+  { id: "comparator", label: "Comparator", description: "Comparator arm, cohort, control, or benchmark." },
+  { id: "decision_use", label: "Decision use", description: "Strategic intent and evidence destination." },
+  { id: "design", label: "Design", description: "Core design logic or analytic approach." },
+]
+
+const STUDY_SCHEMA_USE_CASE_PRESETS: Record<StudySchemaUseCase, StudySchemaContentBlock[]> = {
+  executive_slide: ["objectives", "endpoints", "decision_use"],
+  protocol_overview: ["objectives", "endpoints", "population", "eligibility", "timeline", "comparator", "design"],
+  internal_review: ["objectives", "endpoints", "population", "timeline", "comparator", "decision_use", "design"],
+}
+
+const STUDY_SCHEMA_PATTERN_OPTIONS: Array<{ value: StudySchemaDesignPattern; label: string; description: string }> = [
+  {
+    value: "auto",
+    label: "Auto-select",
+    description: "Infer the best schema pattern from the study category, subtype, and design overview.",
+  },
+  {
+    value: "parallel_group",
+    label: "Parallel-group",
+    description: "Standard randomized or non-randomized treatment comparison with intervention and comparator arms.",
+  },
+  {
+    value: "single_arm",
+    label: "Single-arm",
+    description: "One intervention, exposure, or cohort with no explicit concurrent comparator.",
+  },
+  {
+    value: "cohort_rwe",
+    label: "Cohort / RWE",
+    description: "Observational or database study with cohort construction, comparator definition, and analysis logic.",
+  },
+  {
+    value: "platform_master_protocol",
+    label: "Platform / master protocol",
+    description: "Master protocol with shared infrastructure, arms or cohorts entering/leaving, and integrated readout.",
+  },
+  {
+    value: "adaptive",
+    label: "Adaptive",
+    description: "Study with planned interim adaptation, dose/arm selection, enrichment, futility, or sample-size re-estimation.",
+  },
+  {
+    value: "crossover",
+    label: "Cross-over",
+    description: "Sequence-based design with period 1, washout or transition, period 2, and within-participant comparison.",
+  },
+  {
+    value: "substudy_enabled",
+    label: "Substudy-enabled",
+    description: "Main study plus optional biomarker, PK/PD, imaging, PRO, safety, or regional substudies.",
+  },
+  {
+    value: "evidence_synthesis",
+    label: "Evidence synthesis",
+    description: "Evidence question, search/screening, evidence pool, synthesis, and decision output.",
+  },
+  {
+    value: "non_clinical",
+    label: "Non-clinical",
+    description: "Model, assay, experimental condition, readout, and translational decision package.",
+  },
+]
 
 const initialStudySchema: StudySchemaForm = {
   title: "Study schema",
   schemaType: "",
+  designPattern: "auto",
   orientation: "horizontal",
   detailLevel: "simple",
+  useCase: "executive_slide",
+  contentBlocks: STUDY_SCHEMA_USE_CASE_PRESETS.executive_slide,
   iterationPrompt: "",
   lanes: [],
   nodes: [],
@@ -860,24 +1059,56 @@ const DEFAULT_SCHEDULE_PROMPT = [
   "Treat the schedule as a three-level column hierarchy: Study Phase, Period within Phase, and Visit within Period.",
   "Use grouped activity sections rather than a flat row list.",
   'Use "X" for required activities, blank for not required, and brief qualifiers such as "X (as clinically indicated)" when useful.',
+  "If arms, cohorts, or drugs have different dosing or assessment logic, choose the simplest readable SoA structure: common schedule, common schedule with conditional rows, separate arm/cohort schedules, or separate treatment-administration schedule plus common assessment schedule.",
   "Tailor the complexity to the study need. Pragmatic or operationally light studies can use a simpler cadence; intensive or oncology studies can use a more detailed cadence.",
   "Return a Word-friendly table structure that preserves the hierarchy instead of flattening it.",
 ].join("\n")
+
+const SCHEDULE_STRUCTURE_OPTIONS: Array<{ value: ScheduleStructureMode; label: string; description: string }> = [
+  {
+    value: "auto",
+    label: "Auto",
+    description: "Let AI choose the simplest readable structure based on arms, cohorts, drugs, dosing, and assessments.",
+  },
+  {
+    value: "common",
+    label: "One common SoA",
+    description: "Best when arms or cohorts share the same visits and assessments.",
+  },
+  {
+    value: "conditional",
+    label: "Common SoA + conditional rows",
+    description: "Best when most visits are shared but some rows apply only to specific arms, cohorts, regions, or substudies.",
+  },
+  {
+    value: "separate_by_arm",
+    label: "Separate by arm/cohort",
+    description: "Best when cohorts or arms have meaningfully different visit schedules, dosing cadence, or assessment timing.",
+  },
+  {
+    value: "dosing_plus_common",
+    label: "Dosing table + common assessments",
+    description: "Best when treatment administration differs but efficacy, safety, and follow-up assessments are mostly shared.",
+  },
+]
 
 const initialScheduleForm: ScheduleForm = {
   purpose: "",
   prompt: DEFAULT_SCHEDULE_PROMPT,
   iterationPrompt: "",
   tableLayout: "auto",
+  structureMode: "auto",
   columns: [],
   rows: [],
   generatedAt: "",
   provenance: "empty",
   manualEdited: false,
+  sourceFingerprint: "",
 }
 
 const initialScheduleInsights: ScheduleInsights = {
   focus: "",
+  mode: "",
   generatedAt: "",
   provenance: "empty",
   complexity: {
@@ -913,14 +1144,22 @@ const initialSampleSizeEstimate: SampleSizeEstimate = {
   generatedAt: "",
   methodKey: "generic",
   methodLabel: "",
+  reliabilityLabel: "",
+  formula: "",
   summary: "",
   missing: [],
   assumptions: [],
+  auditTrail: [],
+  warnings: [],
   notes: [],
   estimatedPerArm: 0,
+  estimatedControlArm: 0,
+  estimatedTreatmentArm: 0,
   estimatedTotal: 0,
   adjustedTotal: 0,
   attritionRate: 0,
+  allocationRatio: 1,
+  nonInferiorityMargin: null,
   plannedTotal: null,
   plannedGap: null,
   plannedStatus: "unknown",
@@ -948,6 +1187,11 @@ const initialImpactAssessment: ImpactAssessment = {
   strengthenActions: [],
 }
 
+const initialWorkflowOptions: WorkflowOptions = {
+  useLiterature: false,
+  useSchedule: true,
+}
+
 function normalizeProjectName(name: string, fallback = "New synopsis") {
   return name.trim() || fallback
 }
@@ -959,6 +1203,7 @@ function createProjectId() {
 function buildEmptyWorkspaceSnapshot(): WorkspaceSnapshot {
   return {
     activeTab: "study",
+    workflowOptions: { ...initialWorkflowOptions },
     study: normalizeStudyForm(initialStudyForm),
     studySchema: normalizeStudySchema(initialStudySchema),
     pico: { ...initialPicoForm },
@@ -986,6 +1231,16 @@ function normalizeWorkspaceSnapshot(snapshot?: Partial<WorkspaceSnapshot>): Work
 
   return {
     activeTab: TABS.some((tab) => tab.id === snapshot?.activeTab) ? (snapshot?.activeTab as TabId) : baseline.activeTab,
+    workflowOptions: {
+      ...baseline.workflowOptions,
+      ...(snapshot?.workflowOptions || {}),
+      useLiterature:
+        snapshot?.workflowOptions?.useLiterature ??
+        Boolean(snapshot?.literature?.pubmedQuery || snapshot?.literature?.backgroundThemes),
+      useSchedule:
+        snapshot?.workflowOptions?.useSchedule ??
+        Boolean(snapshot?.schedule?.columns?.length || snapshot?.schedule?.rows?.length),
+    },
     study: normalizeStudyForm(snapshot?.study),
     studySchema: normalizeStudySchema(snapshot?.studySchema),
     pico: { ...baseline.pico, ...(snapshot?.pico || {}) },
@@ -1088,8 +1343,9 @@ function normalizeStudyForm(study?: Partial<StudyForm>): StudyForm {
   const normalizedCategory =
     matchControlledOption(String(study?.category || ""), categoryCandidates) ||
     (categoryCandidates.includes(String(study?.category || "")) ? String(study?.category || "") : initialStudyForm.category)
-  const subcategoryOptions =
-    STUDY_CATEGORIES[normalizedCategory as keyof typeof STUDY_CATEGORIES]?.subcategories ?? []
+  const subcategoryOptions: string[] = [
+    ...(STUDY_CATEGORIES[normalizedCategory as keyof typeof STUDY_CATEGORIES]?.subcategories ?? []),
+  ]
   const normalizedSubcategory =
     matchControlledOption(String(study?.subcategory || ""), subcategoryOptions) ||
     (subcategoryOptions.includes(String(study?.subcategory || "")) ? String(study?.subcategory || "") : "") ||
@@ -1108,10 +1364,38 @@ function normalizeStudyForm(study?: Partial<StudyForm>): StudyForm {
       ? study.secondaryStrategicObjectives
       : [],
     selectedEndpoints: Array.isArray(study?.selectedEndpoints) ? study.selectedEndpoints : [],
+    protocolGuardrailProfile:
+      study?.protocolGuardrailProfile === "none" ||
+      study?.protocolGuardrailProfile === "practice_informing_ped" ||
+      study?.protocolGuardrailProfile === "lean_decision_evidence" ||
+      study?.protocolGuardrailProfile === "auto"
+        ? study.protocolGuardrailProfile
+        : "auto",
+    phase3SafetyDataAvailable:
+      study?.phase3SafetyDataAvailable === "yes" ||
+      study?.phase3SafetyDataAvailable === "no" ||
+      study?.phase3SafetyDataAvailable === "unknown"
+        ? study.phase3SafetyDataAvailable
+        : "",
   }
 }
 
 function normalizeStudySchema(schema?: Partial<StudySchemaForm>): StudySchemaForm {
+  const useCase: StudySchemaUseCase =
+    schema?.useCase === "protocol_overview" || schema?.useCase === "internal_review" || schema?.useCase === "executive_slide"
+      ? schema.useCase
+      : "executive_slide"
+  const designPattern: StudySchemaDesignPattern = STUDY_SCHEMA_PATTERN_OPTIONS.some(
+    (option) => option.value === schema?.designPattern,
+  )
+    ? (schema?.designPattern as StudySchemaDesignPattern)
+    : "auto"
+  const contentBlocks = Array.isArray(schema?.contentBlocks)
+    ? schema.contentBlocks.filter((block): block is StudySchemaContentBlock =>
+        STUDY_SCHEMA_CONTENT_OPTIONS.some((option) => option.id === block),
+      )
+    : STUDY_SCHEMA_USE_CASE_PRESETS[useCase]
+
   return {
     ...initialStudySchema,
     ...schema,
@@ -1120,6 +1404,9 @@ function normalizeStudySchema(schema?: Partial<StudySchemaForm>): StudySchemaFor
       schema?.detailLevel === "simple" || schema?.detailLevel === "detailed" || schema?.detailLevel === "standard"
         ? schema.detailLevel
         : "simple",
+    designPattern,
+    useCase,
+    contentBlocks: contentBlocks.length ? contentBlocks : STUDY_SCHEMA_USE_CASE_PRESETS[useCase],
     lanes: Array.isArray(schema?.lanes) ? schema.lanes : [],
     nodes: Array.isArray(schema?.nodes) ? schema.nodes : [],
     edges: Array.isArray(schema?.edges) ? schema.edges : [],
@@ -1135,6 +1422,14 @@ function normalizeSchedule(schedule?: Partial<ScheduleForm>): ScheduleForm {
   const tableLayout: ScheduleTableLayout =
     schedule?.tableLayout === "single" || schedule?.tableLayout === "split" || schedule?.tableLayout === "auto"
       ? schedule.tableLayout
+      : "auto"
+  const structureMode: ScheduleStructureMode =
+    schedule?.structureMode === "common" ||
+    schedule?.structureMode === "conditional" ||
+    schedule?.structureMode === "separate_by_arm" ||
+    schedule?.structureMode === "dosing_plus_common" ||
+    schedule?.structureMode === "auto"
+      ? schedule.structureMode
       : "auto"
   const seenColumnIds = new Set<string>()
   const columns = Array.isArray(schedule?.columns)
@@ -1160,6 +1455,7 @@ function normalizeSchedule(schedule?: Partial<ScheduleForm>): ScheduleForm {
     ...schedule,
     prompt: schedule?.prompt || DEFAULT_SCHEDULE_PROMPT,
     tableLayout,
+    structureMode,
     columns,
     rows: Array.isArray(schedule?.rows)
       ? schedule.rows.map((row, rowIndex) => {
@@ -1184,6 +1480,12 @@ function normalizeScheduleInsights(insights?: Partial<ScheduleInsights>): Schedu
   return {
     ...initialScheduleInsights,
     ...insights,
+    mode:
+      insights?.mode === "complexity" || insights?.mode === "tradeoff"
+        ? insights.mode
+        : insights?.generatedAt
+          ? "complexity"
+          : "",
     complexity: {
       ...initialScheduleInsights.complexity,
       ...insights?.complexity,
@@ -1373,14 +1675,31 @@ function findBalancedScheduleSplitIndex(columns: ScheduleColumn[]) {
   )
 }
 
+function hasScheduleCellValue(value: string) {
+  const normalized = value.trim()
+
+  return Boolean(normalized && !/^[-–—]+$/.test(normalized))
+}
+
 function buildScheduleSubset(schedule: ScheduleForm, columns: ScheduleColumn[]) {
+  const rows = schedule.rows
+    .map((row) => ({
+      ...row,
+      cells: Object.fromEntries(columns.map((column) => [column.id, row.cells[column.id] || ""])) as Record<string, string>,
+    }))
+    .filter((row) => columns.some((column) => hasScheduleCellValue(row.cells[column.id] || "")))
+
   return normalizeSchedule({
     ...schedule,
     columns,
-    rows: schedule.rows.map((row) => ({
-      ...row,
-      cells: Object.fromEntries(columns.map((column) => [column.id, row.cells[column.id] || ""])) as Record<string, string>,
-    })),
+    rows,
+  })
+}
+
+function compactScheduleForSplitDisplay(schedule: ScheduleForm) {
+  return normalizeSchedule({
+    ...schedule,
+    rows: schedule.rows.filter((row) => schedule.columns.some((column) => hasScheduleCellValue(row.cells[column.id] || ""))),
   })
 }
 
@@ -1453,6 +1772,42 @@ function getScheduleTablePresentation(schedule: ScheduleForm): {
   const trailingColumns = schedule.columns.slice(splitIndex)
   const leadingSchedule = buildScheduleSubset(schedule, leadingColumns)
   const trailingSchedule = buildScheduleSubset(schedule, trailingColumns)
+  const nonEmptyTables = [
+    {
+      id: "lead",
+      title: splitKind === "follow_up" ? "Core schedule" : "Earlier visit schedule",
+      description:
+        splitKind === "follow_up"
+          ? "Screening and on-treatment visits grouped together for the main operational view."
+          : "Earlier visits shown separately to keep the visit matrix readable.",
+      schedule: leadingSchedule,
+    },
+    {
+      id: "trail",
+      title: splitKind === "follow_up" ? "Follow-up schedule" : "Later visit schedule",
+      description:
+        splitKind === "follow_up"
+          ? "End-of-treatment and follow-up visits separated for easier review."
+          : "Later visits shown in a second table to reduce horizontal scanning.",
+      schedule: trailingSchedule,
+    },
+  ].filter((table) => table.schedule.columns.length && table.schedule.rows.length)
+
+  if (nonEmptyTables.length < 2) {
+    return {
+      effectiveLayout: "single",
+      recommendation:
+        "Single-table view selected because splitting would create an empty or low-value table after removing rows with no activities in that visit range.",
+      tables: [
+        {
+          id: "all",
+          title: "Schedule of Activities",
+          description: "",
+          schedule: compactScheduleForSplitDisplay(schedule),
+        },
+      ],
+    }
+  }
 
   return {
     effectiveLayout: "split",
@@ -1462,27 +1817,69 @@ function getScheduleTablePresentation(schedule: ScheduleForm): {
         : splitKind === "follow_up"
           ? "Split-table view selected. The follow-up phase is separated from the core treatment schedule."
           : "Split-table view selected. Earlier and later visits are separated for easier scanning.",
-    tables: [
-      {
-        id: "lead",
-        title: splitKind === "follow_up" ? "Core schedule" : "Earlier visit schedule",
-        description:
-          splitKind === "follow_up"
-            ? "Screening and on-treatment visits grouped together for the main operational view."
-            : "Earlier visits shown separately to keep the visit matrix readable.",
-        schedule: leadingSchedule,
-      },
-      {
-        id: "trail",
-        title: splitKind === "follow_up" ? "Follow-up schedule" : "Later visit schedule",
-        description:
-          splitKind === "follow_up"
-            ? "End-of-treatment and follow-up visits separated for easier review."
-            : "Later visits shown in a second table to reduce horizontal scanning.",
-        schedule: trailingSchedule,
-      },
-    ],
+    tables: nonEmptyTables,
   }
+}
+
+function getScheduleStructureOption(mode: ScheduleStructureMode) {
+  return SCHEDULE_STRUCTURE_OPTIONS.find((option) => option.value === mode) || SCHEDULE_STRUCTURE_OPTIONS[0]
+}
+
+function inferRecommendedScheduleStructureMode(study: StudyForm, schedule?: Partial<ScheduleForm>): Exclude<ScheduleStructureMode, "auto"> {
+  const text = [
+    study.designOverview,
+    study.population,
+    study.intervention,
+    study.comparator,
+    study.topIntervention,
+    study.topComparator,
+    study.topInterventionClass,
+    study.operationalNotes,
+    study.timeline,
+    schedule?.iterationPrompt,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+  const hasDifferentDosing = /different dosing|different dose|dose level|dose escalation|dose expansion|q\d+w|q\d+d|weekly|every \d+ weeks|loading dose|maintenance|combination|background therapy/.test(text)
+  const hasCohortsOrArms = /cohort|arm|randomi[sz]ed|parallel|control|comparator|placebo|active comparator|2:1|1:1|crossover/.test(text)
+  const hasComplexCohorts = /biomarker|substudy|sub-study|region|strat|cohort [a-z0-9]|part 1|part 2|phase 1b|dose escalation|dose expansion/.test(text)
+
+  if (hasComplexCohorts && hasDifferentDosing) return "separate_by_arm"
+  if (hasDifferentDosing && hasCohortsOrArms) return "dosing_plus_common"
+  if (hasCohortsOrArms || hasComplexCohorts) return "conditional"
+  return "common"
+}
+
+function getResolvedScheduleStructureMode(study: StudyForm, schedule?: Partial<ScheduleForm>): Exclude<ScheduleStructureMode, "auto"> {
+  if (schedule?.structureMode && schedule.structureMode !== "auto") {
+    return schedule.structureMode
+  }
+
+  return inferRecommendedScheduleStructureMode(study, schedule)
+}
+
+function buildScheduleStructureInstruction(study: StudyForm, schedule?: Partial<ScheduleForm>) {
+  const requestedMode = schedule?.structureMode || "auto"
+  const resolvedMode = getResolvedScheduleStructureMode(study, schedule)
+  const option = getScheduleStructureOption(resolvedMode)
+  const prefix =
+    requestedMode === "auto"
+      ? `SoA structure mode: Auto recommends "${option.label}".`
+      : `SoA structure mode: User selected "${option.label}".`
+
+  const modeInstruction: Record<Exclude<ScheduleStructureMode, "auto">, string> = {
+    common:
+      "Generate one common SoA. Use this only if arms, cohorts, drugs, and follow-up share the same visit and assessment cadence.",
+    conditional:
+      "Generate one common SoA with concise conditional row or cell notes for arm-, cohort-, region-, or substudy-specific activities. Do not duplicate the whole schedule if differences are minor.",
+    separate_by_arm:
+      "Represent separate arm/cohort logic clearly. Prefer section groups or table descriptions that distinguish cohorts/arms with different visit schedules, dosing, or assessments. Keep common assessments consolidated where possible.",
+    dosing_plus_common:
+      "Separate treatment-administration or dosing-specific rows from common efficacy, safety, and follow-up assessment rows. This is preferred when drugs have different dosing cadence but most assessments are shared.",
+  }
+
+  return `${prefix} ${modeInstruction[resolvedMode]} Keep the structure readable and avoid forcing complex arm/cohort logic into ambiguous notes.`
 }
 
 function getSelectedDiseaseLabel(study: StudyForm) {
@@ -1552,6 +1949,85 @@ function getPrimaryEvidenceUseIntent(study: StudyForm) {
 
 function getAllEvidenceUseIntents(study: StudyForm) {
   return uniqueItemsCaseInsensitive([getPrimaryEvidenceUseIntent(study), ...(study.secondaryEvidenceUseIntents || [])])
+}
+
+function getSuggestedProtocolGuardrailProfile(study: StudyForm): Exclude<ProtocolGuardrailProfile, "auto"> {
+  const category = (study.category || "").toLowerCase()
+  const intentText = `${inferPrimaryStudyAim(study)} ${getStrategicObjectiveLabel(study)} ${getPrimaryEvidenceUseIntent(study)} ${(study.secondaryEvidenceUseIntents || []).join(" ")}`.toLowerCase()
+  const isInterventional = category === "interventional"
+
+  if (!isInterventional) {
+    return "none"
+  }
+
+  if (/guideline|practice|inform clinical practice/.test(intentText)) {
+    return "practice_informing_ped"
+  }
+
+  if (/hta|market access|publication|real-world evidence/.test(intentText)) {
+    return "lean_decision_evidence"
+  }
+
+  return "none"
+}
+
+function getResolvedProtocolGuardrailProfile(study: StudyForm): Exclude<ProtocolGuardrailProfile, "auto"> {
+  if (study.protocolGuardrailProfile === "auto") {
+    return getSuggestedProtocolGuardrailProfile(study)
+  }
+
+  if (study.protocolGuardrailProfile === "practice_informing_ped" || study.protocolGuardrailProfile === "lean_decision_evidence") {
+    return study.protocolGuardrailProfile
+  }
+
+  return "none"
+}
+
+function buildProtocolGuardrailInstruction(study: StudyForm) {
+  const profile = getResolvedProtocolGuardrailProfile(study)
+
+  if (profile === "none") {
+    return "Protocol guardrail profile: none selected."
+  }
+
+  const safetyStatus =
+    study.phase3SafetyDataAvailable === "yes"
+      ? "Phase 3 safety data available."
+      : study.phase3SafetyDataAvailable === "no"
+        ? "Phase 3 safety data not available; do not imply the IEGP PED template applies, but still keep lean fit-for-purpose discipline."
+        : "Phase 3 safety data availability not confirmed; apply guardrails directionally and flag this assumption."
+
+  const shared =
+    "Keep the study concept focused: limit objectives, avoid endpoint laundry lists, make duration explicit, avoid unnecessary sub-studies or branching arms, and streamline data collection to what supports the objective, estimand, endpoint package, essential safety, or feasibility."
+  const specialAssessmentDiscipline =
+    "Special assessment discipline: PRO/COA should be included only when symptoms, functioning, QoL, tolerability, HTA, or practice interpretation are decision-critical; PK/PD or exposure-response should be included only for dose, safety, bridging, or special-population questions; biomarkers or biospecimens should be included only when they define eligibility, stratification, endpoint interpretation, safety risk, or a prespecified decision; extra imaging, labs, ECG, wearables, or remote assessments should be minimized and tied to endpoints, safety, or feasibility."
+
+  if (profile === "practice_informing_ped") {
+    return [
+      "Protocol guardrail profile: practice-informing PED guardrails.",
+      safetyStatus,
+      "Use this discipline for late-stage/post-marketing interventional studies intended to inform clinical practice or guidelines.",
+      "Target no more than 5 objectives, usually 1-2 endpoints per objective, no exploratory endpoints unless individually justified, simple fit-for-purpose design, inclusive label-consistent population, explicit participant duration, and a Schedule of Activities that can fit roughly within 2 pages.",
+      specialAssessmentDiscipline,
+      shared,
+    ].join(" ")
+  }
+
+  return [
+    "Protocol guardrail profile: lean decision-evidence guardrails.",
+    "Use this lighter discipline for HTA, market-access, publication, or pragmatic evidence-generation concepts.",
+    "Prefer one clear primary objective, focused secondary objectives, 1 primary endpoint, 1-2 key secondary endpoints, and only decision-critical operational or patient-centered data collection.",
+    specialAssessmentDiscipline,
+    shared,
+  ].join(" ")
+}
+
+function buildStudyForAi(study: StudyForm): StudyForm {
+  return normalizeStudyForm({
+    ...study,
+    protocolGuardrailProfile: getResolvedProtocolGuardrailProfile(study),
+    protocolGuardrailNotes: buildProtocolGuardrailInstruction(study),
+  })
 }
 
 function getAllChosenEndpoints(study: StudyForm) {
@@ -1792,13 +2268,13 @@ function buildImportedStudyPatch(current: StudyForm, imported: ImportedStudyDraf
     }
 
     if ((!currentValue || canFill(currentValue)) && !valuesMatch(currentValue, normalized)) {
-      next[key] = normalized as StudyForm[typeof key]
+      ;(next as unknown as Record<string, string>)[key] = normalized
       appliedFields.push(label)
       return { changed: true, replaced: false }
     }
 
     if ((options?.mode || "fill_blank") === "prefer_source" && !valuesMatch(currentValue, normalized)) {
-      next[key] = normalized as StudyForm[typeof key]
+      ;(next as unknown as Record<string, string>)[key] = normalized
       replacedFields.push(label)
       conflictNotes.push(`${label} updated from "${summarizeImportValue(currentValue)}" to "${summarizeImportValue(normalized)}" to match the uploaded source.`)
       return { changed: true, replaced: true }
@@ -2288,16 +2764,16 @@ function buildPrimaryIntentAlignment(study: StudyForm): SuggestionAlignment | nu
 
 function getImpactAssessmentMissing(study: StudyForm) {
   const missing = []
+  const studyType = (study.subcategory || study.category || "").trim()
+  const diseaseOrTopic = (getSelectedDiseaseLabel(study) || study.indication || "").trim()
+  const interventionOrExposure = ((study.topIntervention || "").trim() || (study.intervention || "").trim())
+  const category = (study.category || "").trim()
 
   if (!hasPrimaryStudyAimSelection(study)) missing.push("primary study aim")
-  if (!(study.developmentStage || "").trim()) missing.push("development stage")
-  if (!(study.therapeuticArea || "").trim()) missing.push("therapeutic area")
-  if (!getSelectedDiseaseLabel(study)) missing.push("disease")
-  if (!((study.topIntervention || "").trim() || (study.intervention || "").trim())) missing.push("intervention")
-  if (!((study.topComparator || "").trim() || (study.comparator || "").trim())) missing.push("comparator")
+  if (!studyType) missing.push("study type")
+  if (!diseaseOrTopic) missing.push(category === "evidence-synthesis" ? "disease or evidence topic" : "disease")
+  if (category !== "evidence-synthesis" && !interventionOrExposure) missing.push("intervention or exposure")
   if (!(study.primaryObjective || "").trim()) missing.push("primary objective")
-  if (!getResolvedOutcomes(study)) missing.push("endpoints")
-  if (!(study.subcategory || study.category || "").trim()) missing.push("study type")
 
   return missing
 }
@@ -2925,6 +3401,7 @@ function buildEndpointSuggestionOptionsFromStudy(
     ? guidedEndpoints
     : ["Primary efficacy outcome", "Safety and tolerability", "Quality of life", "Biomarker response"]
   const endpointContext = `${strategicObjective} ${evidenceIntent}`.toLowerCase()
+  const protocolGuardrailProfile = getResolvedProtocolGuardrailProfile(study)
 
   const matchFromPool = (patterns: RegExp[], fallbackIndex = 0) =>
     defaultPool.find((endpoint) => patterns.some((pattern) => pattern.test(endpoint.toLowerCase()))) || defaultPool[fallbackIndex]
@@ -2966,8 +3443,10 @@ function buildEndpointSuggestionOptionsFromStudy(
     /market access|hta|guideline|practice/.test(endpointContext) ? "Supportive patient-reported experience" : "",
   ].filter(Boolean)
   const exploratoryEndpoints =
-    /biomarker|subgroup|dose|exploratory|mechanistic/.test(requestNote.toLowerCase()) ||
-    /oncology|tumou?r|biomarker|dose/.test(`${study.therapeuticArea} ${study.topInterventionClass} ${strategicObjective}`.toLowerCase())
+    protocolGuardrailProfile === "practice_informing_ped" && !/biomarker|subgroup|dose|exploratory|mechanistic/.test(requestNote.toLowerCase())
+      ? []
+      : /biomarker|subgroup|dose|exploratory|mechanistic/.test(requestNote.toLowerCase()) ||
+          /oncology|tumou?r|biomarker|dose/.test(`${study.therapeuticArea} ${study.topInterventionClass} ${strategicObjective}`.toLowerCase())
       ? prioritizeFocusedEndpoints(
           exploratoryCandidates.filter((endpoint) => endpoint !== primaryEndpoint && !secondaryEndpoints.includes(endpoint)),
           objective,
@@ -3316,6 +3795,81 @@ function parsePlannedSampleTotal(value: string) {
   return Math.max(...integers)
 }
 
+function parseAllocationRatio(...values: string[]) {
+  const text = values.join(" ")
+  const ratioMatch = text.match(/(?:allocation|randomi[sz]ation|ratio)?[^0-9]*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/i)
+
+  if (!ratioMatch) {
+    return 1
+  }
+
+  const left = Number(ratioMatch[1])
+  const right = Number(ratioMatch[2])
+
+  if (!Number.isFinite(left) || !Number.isFinite(right) || left <= 0 || right <= 0) {
+    return 1
+  }
+
+  return Math.max(0.1, Math.min(10, left / right))
+}
+
+function parseNonInferiorityMargin(...values: string[]) {
+  const text = values.join(" ")
+  const marginMatch = text.match(/(?:non[- ]?inferiority|ni|margin)[^0-9]*(\d+(?:\.\d+)?)\s*%/i)
+
+  if (marginMatch) {
+    return Number(marginMatch[1]) / 100
+  }
+
+  const riskDifferenceMargin = text.match(/(?:risk difference|rd)[^0-9]*(\d+(?:\.\d+)?)\s*%[^.]{0,80}(?:margin|non[- ]?inferiority|ni)/i)
+
+  if (riskDifferenceMargin) {
+    return Number(riskDifferenceMargin[1]) / 100
+  }
+
+  return null
+}
+
+function isNonInferiorityDesign(stats: StatsForm) {
+  return /non[- ]?inferiority|\bNI\b|noninferior/i.test(
+    `${stats.hypothesis} ${stats.effectSize} ${stats.rationale} ${stats.analysisModel}`,
+  )
+}
+
+function getUnsupportedSampleSizeWarnings(study: StudyForm, stats: StatsForm) {
+  const text = `${study.designOverview} ${study.subcategory} ${stats.hypothesis} ${stats.analysisModel} ${stats.rationale}`.toLowerCase()
+  const warnings = [
+    /adaptive|group[- ]?sequential|interim.*sample|sample.*re-estimation/.test(text)
+      ? "Adaptive, group-sequential, or sample-size re-estimation designs require a validated statistical tool and biostatistics review."
+      : "",
+    /bayesian/.test(text) ? "Bayesian designs are not covered by the deterministic calculator." : "",
+    /cluster|intracluster|icc|site randomi[sz]ation/.test(text)
+      ? "Cluster or site-randomized designs require design-effect inflation that is not estimated here."
+      : "",
+    /recurrent event|negative binomial|rate ratio|person[- ]?time/.test(text)
+      ? "Recurrent-event or rate endpoints need a specialized rate model, not the standard two-arm approximations."
+      : "",
+    /crossover|cross-over/.test(text) ? "Crossover designs require paired or within-subject assumptions that are not estimated here." : "",
+    /multiplicity|hierarchical|family[- ]?wise|co-primary|dual primary/.test(text)
+      ? "Multiplicity or co-primary endpoint strategy may change the alpha allocation and should be checked by biostatistics."
+      : "",
+  ].filter(Boolean)
+
+  return [...new Set(warnings)]
+}
+
+function buildReliabilityLabel(warnings: string[], methodKey: SampleSizeEstimate["methodKey"]) {
+  if (warnings.some((warning) => /not covered|require|specialized/i.test(warning))) {
+    return "Biostatistics review required"
+  }
+
+  if (methodKey === "generic") {
+    return "Directional planning estimate"
+  }
+
+  return "Deterministic planning estimate"
+}
+
 function inverseStandardNormal(probability: number) {
   const a = [-39.6968302866538, 220.946098424521, -275.928510446969, 138.357751867269, -30.6647980661472, 2.50662827745924]
   const b = [-54.4760987982241, 161.585836858041, -155.698979859887, 66.8013118877197, -13.2806815528857]
@@ -3359,6 +3913,9 @@ function getSampleSizeEstimateMissing(stats: StatsForm) {
   } else if (endpointType.includes("binary")) {
     if (!parseBinaryEffectRange(stats.effectSize)) missing.push("absolute effect difference")
     if (!parseBinaryBaselineRate(stats.variability, stats.effectSize)) missing.push("baseline event rate")
+    if (isNonInferiorityDesign(stats) && !parseNonInferiorityMargin(stats.hypothesis, stats.effectSize, stats.rationale)) {
+      missing.push("non-inferiority margin")
+    }
   } else if (!parseContinuousEffectRange(stats.effectSize)) {
     missing.push("numeric effect size")
   }
@@ -3399,20 +3956,32 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
   const zPower = inverseStandardNormal(powerAssumption.base)
   const endpointType = (stats.endpointType || "").trim().toLowerCase()
   const attritionRate = attritionAssumption.base
+  const allocationRatio = parseAllocationRatio(study.designOverview, stats.hypothesis, stats.rationale)
+  const unsupportedWarnings = getUnsupportedSampleSizeWarnings(study, stats)
   const assumptions = [
     `${alphaAssumption.twoSided ? "Two-sided" : "One-sided"} alpha ${alphaAssumption.alpha.toFixed(3)}`,
     `Power ${Math.round(powerAssumption.base * 100)}%`,
     `Attrition / non-evaluable rate ${Math.round(attritionRate * 100)}%`,
+    `Allocation ratio ${allocationRatio.toFixed(2)}:1 treatment:control`,
   ]
+  const auditTrail = [
+    "AI is used to extract or draft assumptions; deterministic code performs the numeric calculation.",
+    `Z(alpha)=${zAlpha.toFixed(3)} and Z(power)=${zPower.toFixed(3)} were derived from the entered alpha and power assumptions.`,
+  ]
+  const warnings: string[] = [...unsupportedWarnings]
   const notes: string[] = []
 
   const calculateAdjustedTotal = (total: number) => Math.ceil(total / Math.max(0.05, 1 - attritionRate))
 
   let methodKey: SampleSizeEstimate["methodKey"] = "generic"
   let methodLabel = "Standardized-effect approximation"
+  let formula = ""
   let estimatedPerArm = 0
+  let estimatedControlArm = 0
+  let estimatedTreatmentArm = 0
   let estimatedTotal = 0
   let adjustedTotal = 0
+  let nonInferiorityMargin: number | null = null
   let sensitivity: SampleSizeScenario[] = []
 
   if (endpointType.includes("time-to-event") || endpointType.includes("time to event")) {
@@ -3431,8 +4000,10 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
 
     methodKey = "time_to_event"
     methodLabel = "Time-to-event, event-driven approximation"
+    formula = "Required events = 4 x (Zalpha + Zpower)^2 / [ln(HR)]^2; total N = required events / expected event proportion."
     assumptions.push(`Hazard ratio ${hazardRatioRange.base.toFixed(2)}`)
     assumptions.push(`Expected event proportion ${Math.round(eventProportionRange.base * 100)}%`)
+    auditTrail.push(`Required events are calculated from HR=${hazardRatioRange.base.toFixed(2)} and expected event proportion=${eventProportionRange.base.toFixed(2)}.`)
 
     const computeTotal = (hazardRatio: number) => {
       const requiredEvents = Math.ceil((4 * (zAlpha + zPower) ** 2) / Math.max(0.0001, Math.log(hazardRatio) ** 2))
@@ -3440,7 +4011,9 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
     }
 
     estimatedTotal = computeTotal(hazardRatioRange.base)
-    estimatedPerArm = Math.ceil(estimatedTotal / 2)
+    estimatedControlArm = Math.ceil(estimatedTotal / (1 + allocationRatio))
+    estimatedTreatmentArm = Math.ceil(estimatedControlArm * allocationRatio)
+    estimatedPerArm = allocationRatio === 1 ? Math.ceil(estimatedTotal / 2) : 0
     adjustedTotal = calculateAdjustedTotal(estimatedTotal)
 
     const lowerEffectHr = hazardRatioRange.high !== hazardRatioRange.low ? Math.max(0.05, hazardRatioRange.high) : Math.min(0.99, hazardRatioRange.base + (1 - hazardRatioRange.base) * 0.2)
@@ -3457,7 +4030,10 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
         adjustedTotal: calculateAdjustedTotal(computeTotal(higherEffectHr)),
       },
     ]
-    notes.push("This approximation assumes equal allocation and uses the entered event proportion as the bridge from required events to total sample size.")
+    notes.push("This approximation uses the entered event proportion as the bridge from required events to total sample size.")
+    if (allocationRatio !== 1) {
+      notes.push("Allocation ratio is shown for arm split, but the event-count approximation itself assumes proportional hazards and should be checked by biostatistics for unequal allocation.")
+    }
   } else if (endpointType.includes("binary")) {
     const effectRange = parseBinaryEffectRange(stats.effectSize)
     const baselineRateRange = parseBinaryBaselineRate(stats.variability, stats.effectSize)
@@ -3472,25 +4048,51 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
       }
     }
 
-    methodKey = "binary"
-    methodLabel = "Two-proportion comparison"
+    const nonInferiority = isNonInferiorityDesign(stats)
+    nonInferiorityMargin = nonInferiority ? parseNonInferiorityMargin(stats.hypothesis, stats.effectSize, stats.rationale) : null
+    methodKey = nonInferiority ? "binary_non_inferiority" : "binary"
+    methodLabel = nonInferiority ? "Binary non-inferiority risk-difference approximation" : "Two-proportion comparison"
+    formula = nonInferiority
+      ? "Control-arm N = [(Zalpha + Zpower)^2 x (pT(1-pT)/r + pC(1-pC))] / (expected difference + NI margin)^2; treatment-arm N = r x control-arm N."
+      : "Control-arm N = [Zalpha x sqrt((1+1/r)pbar(1-pbar)) + Zpower x sqrt(pT(1-pT)/r + pC(1-pC))]^2 / (pT-pC)^2; treatment-arm N = r x control-arm N."
     assumptions.push(`Baseline event rate ${Math.round(baselineRateRange.base * 100)}%`)
     assumptions.push(`Absolute difference ${Math.round(effectRange.base * 1000) / 10}%`)
+    if (nonInferiorityMargin !== null) {
+      assumptions.push(`Non-inferiority margin ${Math.round(nonInferiorityMargin * 1000) / 10}%`)
+    }
+    auditTrail.push(
+      `Binary rates are interpreted as treatment/comparator response or event proportions with comparator baseline=${baselineRateRange.base.toFixed(2)} and absolute difference=${effectRange.base.toFixed(2)}.`,
+    )
 
-    const computePerArm = (absoluteDifference: number) => {
-      const baselineRate = baselineRateRange.base
-      const comparatorRate = Math.max(0.01, Math.min(0.99, baselineRate - absoluteDifference))
-      const pooledRate = (baselineRate + comparatorRate) / 2
-      return Math.ceil(
-        ((zAlpha * Math.sqrt(2 * pooledRate * (1 - pooledRate)) +
-          zPower * Math.sqrt(baselineRate * (1 - baselineRate) + comparatorRate * (1 - comparatorRate))) **
-          2) /
-          Math.max(0.0001, absoluteDifference ** 2),
-      )
+    const computeBinaryArms = (absoluteDifference: number) => {
+      const comparatorRate = baselineRateRange.base
+      const treatmentRate = Math.max(0.01, Math.min(0.99, comparatorRate + absoluteDifference))
+      const pooledRate = (treatmentRate + comparatorRate) / 2
+      const denominator = nonInferiority
+        ? Math.max(0.0001, (absoluteDifference + (nonInferiorityMargin || 0)) ** 2)
+        : Math.max(0.0001, absoluteDifference ** 2)
+      const controlArm = nonInferiority
+        ? Math.ceil(((zAlpha + zPower) ** 2 * (treatmentRate * (1 - treatmentRate) / allocationRatio + comparatorRate * (1 - comparatorRate))) / denominator)
+        : Math.ceil(
+            ((zAlpha * Math.sqrt((1 + 1 / allocationRatio) * pooledRate * (1 - pooledRate)) +
+              zPower * Math.sqrt(treatmentRate * (1 - treatmentRate) / allocationRatio + comparatorRate * (1 - comparatorRate))) **
+              2) /
+              denominator,
+          )
+      const treatmentArm = Math.ceil(controlArm * allocationRatio)
+
+      return {
+        controlArm,
+        treatmentArm,
+        total: controlArm + treatmentArm,
+      }
     }
 
-    estimatedPerArm = computePerArm(effectRange.base)
-    estimatedTotal = estimatedPerArm * 2
+    const binaryEstimate = computeBinaryArms(effectRange.base)
+    estimatedControlArm = binaryEstimate.controlArm
+    estimatedTreatmentArm = binaryEstimate.treatmentArm
+    estimatedPerArm = allocationRatio === 1 ? estimatedControlArm : 0
+    estimatedTotal = binaryEstimate.total
     adjustedTotal = calculateAdjustedTotal(estimatedTotal)
 
     const smallerEffect = effectRange.high !== effectRange.low ? effectRange.low : Math.max(0.01, effectRange.base * 0.85)
@@ -3498,16 +4100,20 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
     sensitivity = [
       {
         label: "Smaller absolute difference",
-        total: computePerArm(smallerEffect) * 2,
-        adjustedTotal: calculateAdjustedTotal(computePerArm(smallerEffect) * 2),
+        total: computeBinaryArms(smallerEffect).total,
+        adjustedTotal: calculateAdjustedTotal(computeBinaryArms(smallerEffect).total),
       },
       {
         label: "Larger absolute difference",
-        total: computePerArm(largerEffect) * 2,
-        adjustedTotal: calculateAdjustedTotal(computePerArm(largerEffect) * 2),
+        total: computeBinaryArms(largerEffect).total,
+        adjustedTotal: calculateAdjustedTotal(computeBinaryArms(largerEffect).total),
       },
     ]
-    notes.push("The binary calculation assumes a two-arm comparison and interprets the entered effect size as an absolute difference between arms.")
+    notes.push(
+      nonInferiority
+        ? "The binary non-inferiority calculation uses a risk-difference margin. Confirm margin direction, assay sensitivity, and estimand with biostatistics."
+        : "The binary calculation assumes a two-arm comparison and interprets the entered effect size as an absolute difference between arms.",
+    )
   } else {
     const effectRange = parseContinuousEffectRange(stats.effectSize)
 
@@ -3523,13 +4129,26 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
 
     methodKey = endpointType.includes("continuous") ? "continuous" : "generic"
     methodLabel = endpointType.includes("continuous") ? "Continuous endpoint, standardized-effect approximation" : "Generic standardized-effect approximation"
+    formula = "Control-arm N = (1 + 1/r) x (Zalpha + Zpower)^2 / standardized effect^2; treatment-arm N = r x control-arm N."
     assumptions.push(`Standardized effect size ${effectRange.base.toFixed(2)}`)
+    auditTrail.push(`Continuous/generic calculation uses standardized effect size=${effectRange.base.toFixed(2)} and allocation ratio=${allocationRatio.toFixed(2)}:1.`)
 
-    const computePerArm = (effectSize: number) =>
-      Math.ceil((2 * (zAlpha + zPower) ** 2) / Math.max(0.0001, effectSize ** 2))
+    const computeContinuousArms = (effectSize: number) => {
+      const controlArm = Math.ceil(((1 + 1 / allocationRatio) * (zAlpha + zPower) ** 2) / Math.max(0.0001, effectSize ** 2))
+      const treatmentArm = Math.ceil(controlArm * allocationRatio)
 
-    estimatedPerArm = computePerArm(effectRange.base)
-    estimatedTotal = estimatedPerArm * 2
+      return {
+        controlArm,
+        treatmentArm,
+        total: controlArm + treatmentArm,
+      }
+    }
+
+    const continuousEstimate = computeContinuousArms(effectRange.base)
+    estimatedControlArm = continuousEstimate.controlArm
+    estimatedTreatmentArm = continuousEstimate.treatmentArm
+    estimatedPerArm = allocationRatio === 1 ? estimatedControlArm : 0
+    estimatedTotal = continuousEstimate.total
     adjustedTotal = calculateAdjustedTotal(estimatedTotal)
 
     const smallerEffect = effectRange.high !== effectRange.low ? effectRange.low : Math.max(0.05, effectRange.base * 0.85)
@@ -3537,13 +4156,13 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
     sensitivity = [
       {
         label: "Smaller effect",
-        total: computePerArm(smallerEffect) * 2,
-        adjustedTotal: calculateAdjustedTotal(computePerArm(smallerEffect) * 2),
+        total: computeContinuousArms(smallerEffect).total,
+        adjustedTotal: calculateAdjustedTotal(computeContinuousArms(smallerEffect).total),
       },
       {
         label: "Larger effect",
-        total: computePerArm(largerEffect) * 2,
-        adjustedTotal: calculateAdjustedTotal(computePerArm(largerEffect) * 2),
+        total: computeContinuousArms(largerEffect).total,
+        adjustedTotal: calculateAdjustedTotal(computeContinuousArms(largerEffect).total),
       },
     ]
 
@@ -3562,7 +4181,16 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
           ? "over"
           : "aligned"
 
-  const summary = `Estimated ${estimatedTotal.toLocaleString()} participants total (${estimatedPerArm.toLocaleString()} per arm), increasing to ${adjustedTotal.toLocaleString()} after attrition, using the current ${methodLabel.toLowerCase()}.`
+  const armSummary =
+    allocationRatio === 1
+      ? `${estimatedPerArm.toLocaleString()} per arm`
+      : `${estimatedTreatmentArm.toLocaleString()} treatment / ${estimatedControlArm.toLocaleString()} control`
+  const reliabilityLabel = buildReliabilityLabel(warnings, methodKey)
+  const summary = `Estimated ${estimatedTotal.toLocaleString()} participants total (${armSummary}), increasing to ${adjustedTotal.toLocaleString()} after attrition, using the current ${methodLabel.toLowerCase()}.`
+
+  if (warnings.length) {
+    notes.push("This estimate is useful for planning discussion but should not be used as the calculator of record for protocol sign-off.")
+  }
 
   if (plannedStatus === "under") {
     notes.push("The currently planned sample size appears lower than the requirement implied by the active statistical assumptions.")
@@ -3577,18 +4205,113 @@ function buildSampleSizeEstimate(study: StudyForm, stats: StatsForm): SampleSize
     generatedAt: new Date().toISOString(),
     methodKey,
     methodLabel,
+    reliabilityLabel,
+    formula,
     summary,
     missing: [],
     assumptions,
+    auditTrail,
+    warnings,
     notes,
     estimatedPerArm,
+    estimatedControlArm,
+    estimatedTreatmentArm,
     estimatedTotal,
     adjustedTotal,
     attritionRate,
+    allocationRatio,
+    nonInferiorityMargin,
     plannedTotal,
     plannedGap,
     plannedStatus,
     sensitivity,
+  }
+}
+
+type SampleSizeGenerationPlan = {
+  source: "none" | "planned_only" | "calculated_only" | "planned_aligned" | "planned_conflict"
+  sampleSizeText: string
+  summary: string
+  needsAttention: boolean
+}
+
+function buildCalculatedSampleSizeText(estimate: SampleSizeEstimate) {
+  if (estimate.status !== "ready" || !estimate.adjustedTotal) {
+    return ""
+  }
+
+  const armText =
+    estimate.allocationRatio === 1
+      ? `${estimate.estimatedPerArm.toLocaleString()} per arm`
+      : `${estimate.estimatedTreatmentArm.toLocaleString()} treatment / ${estimate.estimatedControlArm.toLocaleString()} control`
+
+  return [
+    `Calculated planning estimate: ${estimate.adjustedTotal.toLocaleString()} participants after attrition`,
+    `base estimate ${estimate.estimatedTotal.toLocaleString()}; ${armText}`,
+    `method: ${estimate.methodLabel || "sample-size planning approximation"}`,
+    estimate.reliabilityLabel ? `reliability: ${estimate.reliabilityLabel}` : "",
+  ]
+    .filter(Boolean)
+    .join("; ")
+}
+
+function buildSampleSizeGenerationPlan(study: StudyForm, estimate: SampleSizeEstimate): SampleSizeGenerationPlan {
+  const plannedText = (study.sampleSize || "").trim()
+  const calculatedText = buildCalculatedSampleSizeText(estimate)
+
+  if (!plannedText && !calculatedText) {
+    return {
+      source: "none",
+      sampleSizeText: "",
+      summary: "No sample size will be used in generation until the user enters one in Tab 1 or runs the Tab 2 estimate.",
+      needsAttention: true,
+    }
+  }
+
+  if (!plannedText && calculatedText) {
+    return {
+      source: "calculated_only",
+      sampleSizeText: calculatedText,
+      summary: "Tab 1 has no planned sample size. The Tab 2 calculated estimate will be used for section and synopsis generation.",
+      needsAttention: false,
+    }
+  }
+
+  if (plannedText && !calculatedText) {
+    return {
+      source: "planned_only",
+      sampleSizeText: plannedText,
+      summary: "The Tab 1 planned sample size will be used for generation. No Tab 2 estimate is available yet.",
+      needsAttention: false,
+    }
+  }
+
+  if (estimate.plannedStatus === "aligned") {
+    return {
+      source: "planned_aligned",
+      sampleSizeText: `Planned sample size: ${plannedText}. Tab 2 check: ${calculatedText}. Treat as broadly aligned.`,
+      summary: "The planned sample size and Tab 2 estimate are broadly aligned; generation will use the planned value with the statistical check as support.",
+      needsAttention: false,
+    }
+  }
+
+  return {
+    source: "planned_conflict",
+    sampleSizeText: `Planned sample size: ${plannedText}. Tab 2 check: ${calculatedText}. Flag the discrepancy and do not present the calculated value as final unless the user updates the plan.`,
+    summary:
+      "The planned sample size and Tab 2 estimate differ materially. Generation will preserve the Tab 1 plan but should flag the discrepancy for review.",
+    needsAttention: true,
+  }
+}
+
+function applySampleSizeGenerationPlan(study: StudyForm, plan: SampleSizeGenerationPlan): StudyForm {
+  if (!plan.sampleSizeText) {
+    return study
+  }
+
+  return {
+    ...study,
+    sampleSize: plan.sampleSizeText,
   }
 }
 
@@ -3729,6 +4452,18 @@ function buildSampleSizeSuggestions(study: StudyForm, pico: PicoForm, stats: Sta
     })
   }
 
+  if (missing.includes("non-inferiority margin")) {
+    const currentHypothesis = stats.hypothesis.trim() || fallbackStats.hypothesis
+    suggestions.push({
+      id: "non-inferiority-margin",
+      key: "hypothesis",
+      label: "Non-inferiority margin",
+      value: `${currentHypothesis}\nNon-inferiority margin 10% risk difference; confirm this is clinically justified and acceptable for the evidence-use intent.`,
+      rationale:
+        "The non-inferiority calculator needs a prespecified margin. This draft is intentionally explicit so the user can accept, tighten, or replace it.",
+    })
+  }
+
   if (missing.includes("event proportion assumption")) {
     suggestions.push({
       id: "event-proportion",
@@ -3754,18 +4489,34 @@ function buildSampleSizeSuggestions(study: StudyForm, pico: PicoForm, stats: Sta
 
 function validateStudy(study: StudyForm) {
   const missing = []
+  const category = (study.category || "").toLowerCase()
+  const subcategory = (study.subcategory || "").toLowerCase()
+  const evidenceIntent = getPrimaryEvidenceUseIntent(study).toLowerCase()
+  const diseaseOrTopic = (getSelectedDiseaseLabel(study) || getResolvedIndication(study) || "").trim()
+  const interventionOrExposure = ((study.topIntervention || "").trim() || (study.intervention || "").trim())
+  const comparatorOrBenchmark = ((study.topComparator || "").trim() || (study.comparator || "").trim())
+  const isEvidenceSynthesis = category === "evidence-synthesis"
+  const isNonClinical = category === "non-clinical"
+  const needsComparator =
+    category === "interventional" ||
+    (/hta|label|guideline|practice/.test(evidenceIntent) && !isEvidenceSynthesis && !isNonClinical)
 
   if (!(study.studyTitle || "").trim()) missing.push("Study title")
-  if (!(study.developmentStage || "").trim()) missing.push("Development stage")
+  if (category === "interventional" && !(study.developmentStage || "").trim()) missing.push("Development stage")
   if (!hasPrimaryStudyAimSelection(study)) missing.push("Primary study aim")
-  if (!(study.therapeuticArea || "").trim()) missing.push("Therapeutic area")
-  if (!getSelectedDiseaseLabel(study)) missing.push("Disease or custom disease")
-  if (!((study.topIntervention || "").trim() || (study.intervention || "").trim())) missing.push("Intervention / drug")
-  if (!((study.topComparator || "").trim() || (study.comparator || "").trim())) missing.push("Comparator")
-  if (!getResolvedOutcomes(study)) missing.push("Selected, typed, or described endpoints")
+  if (!isEvidenceSynthesis && !isNonClinical && !(study.therapeuticArea || "").trim()) missing.push("Therapeutic area")
+  if (!diseaseOrTopic) missing.push(isEvidenceSynthesis ? "Disease, topic, or evidence question" : "Disease or custom disease")
+  if (!isEvidenceSynthesis && !interventionOrExposure) missing.push(isNonClinical ? "Test article, model, or exposure" : "Intervention / exposure")
+  if (needsComparator && !comparatorOrBenchmark) {
+    missing.push(category === "interventional" ? "Comparator, control, or benchmark" : "Comparator or evidence benchmark")
+  }
+  if (!isEvidenceSynthesis && !getResolvedOutcomes(study)) missing.push("Focused endpoints or outcomes")
   if (!(study.primaryObjective || "").trim()) missing.push("Primary study objective")
-  if (!(study.designOverview || "").trim()) missing.push("Study design overview")
-  if (!(study.population || "").trim()) missing.push("Population")
+  if (!(study.designOverview || "").trim()) missing.push(isEvidenceSynthesis ? "Evidence synthesis method overview" : "Study design overview")
+  if (!isEvidenceSynthesis && !(study.population || "").trim()) missing.push(isNonClinical ? "Model, sample, or assay system" : "Population")
+  if (isEvidenceSynthesis && !(/review|meta|maic|analysis|synthesis/.test(subcategory) || study.designOverview.trim())) {
+    missing.push("Evidence synthesis approach")
+  }
 
   return missing
 }
@@ -3836,6 +4587,7 @@ function makeSection(title: string, prompt: string): SynopsisSection {
     sourceTabs: getSectionSourceTabs(title),
     assumptionFlags: getDefaultAssumptions(title),
     lastGeneratedAt: "",
+    sourceFingerprint: "",
     promptVersion: 1,
     manualEdited: false,
   }
@@ -3851,6 +4603,7 @@ function normalizeSection(section: Partial<SynopsisSection> & Pick<SynopsisSecti
     assumptionFlags: section.assumptionFlags ?? getDefaultAssumptions(section.title),
     promptVersion: section.promptVersion ?? 1,
     lastGeneratedAt: section.lastGeneratedAt ?? "",
+    sourceFingerprint: section.sourceFingerprint ?? "",
     provenance: section.provenance ?? (section.body ? "ai_generated" : "template"),
     manualEdited: section.manualEdited ?? false,
   }
@@ -3957,6 +4710,289 @@ function parseStructuredEditorItems(value: string, previous: StructuredEditorIte
   })
 }
 
+function getProtocolGuardrailStatusTone(status: ProtocolGuardrailCheckStatus) {
+  if (status === "aligned") return "border-emerald-200 bg-emerald-50 text-emerald-800"
+  if (status === "needs_justification") return "border-amber-200 bg-amber-50 text-amber-900"
+  return "border-rose-200 bg-rose-50 text-rose-800"
+}
+
+function getProtocolGuardrailStatusLabel(status: ProtocolGuardrailCheckStatus) {
+  if (status === "aligned") return "Aligned"
+  if (status === "needs_justification") return "Needs justification"
+  return "Consider simplifying"
+}
+
+function containsAnyPattern(value: string, patterns: RegExp[]) {
+  return patterns.some((pattern) => pattern.test(value))
+}
+
+function getSpecialAssessmentSignals(study: StudyForm) {
+  const objectiveText = `${study.primaryObjective} ${study.secondaryObjectives}`.toLowerCase()
+  const endpointText = getResolvedOutcomes(study).toLowerCase()
+  const designText = `${study.designOverview} ${study.population} ${study.eligibility} ${study.operationalNotes}`.toLowerCase()
+  const intentText = `${inferPrimaryStudyAim(study)} ${getStrategicObjectiveLabel(study)} ${getPrimaryEvidenceUseIntent(study)} ${(study.secondaryEvidenceUseIntents || []).join(" ")}`.toLowerCase()
+  const interventionText = `${study.topInterventionClass} ${study.topLineOfTherapy}`.toLowerCase()
+  const combinedText = `${objectiveText} ${endpointText} ${designText} ${intentText} ${interventionText}`
+
+  const proPatterns = [
+    /\bpro\b/,
+    /patient[- ]reported/,
+    /\bcoa\b/,
+    /quality of life|\bqol\b|eq-?5d|fact-|eortc|promis|symptom|functioning|questionnaire/,
+  ]
+  const pkPdPatterns = [
+    /\bpk\b|\bpd\b|pk\/pd|pharmacokinetic|pharmacodynamic|exposure[- ]response|exposure[- ]safety|auc\b|cmax|trough|drug concentration/,
+  ]
+  const biomarkerPatterns = [
+    /biomarker|biospecimen|biopsy|tissue|ctdna|circulating tumor dna|genomic|molecular|mutation|expression|subgroup response|predictive marker/,
+  ]
+  const intensiveAssessmentPatterns = [
+    /central imaging|blinded independent|bicr|serial imaging|ct\/mri|mri|pet|bone scan|ecg|laboratory panel|extra lab|home health|wearable|digital endpoint/,
+  ]
+
+  return {
+    hasPro: containsAnyPattern(combinedText, proPatterns),
+    hasPkPd: containsAnyPattern(combinedText, pkPdPatterns),
+    hasBiomarker: containsAnyPattern(combinedText, biomarkerPatterns),
+    hasIntensiveAssessments: containsAnyPattern(combinedText, intensiveAssessmentPatterns),
+    proJustified: containsAnyPattern(`${objectiveText} ${endpointText} ${intentText}`, [
+      /patient[- ]reported|quality of life|\bqol\b|symptom|functioning|tolerability|treatment burden|hta|market access|practice|guideline/,
+    ]),
+    pkPdJustified: containsAnyPattern(`${objectiveText} ${endpointText} ${intentText} ${interventionText}`, [
+      /dose|dose modification|dose optimization|exposure|pk\/pd|pharmacokinetic|pharmacodynamic|safety|toxicity|special population|renal|hepatic|bridging/,
+    ]),
+    biomarkerJustified: containsAnyPattern(`${objectiveText} ${endpointText} ${designText} ${intentText} ${study.customDisease} ${study.disease}`, [
+      /biomarker-defined|marker-defined|mutation|molecularly defined|stratification|predictive|prognostic|companion diagnostic|eligibility|population definition|subgroup/,
+    ]),
+    intensiveAssessmentsJustified: containsAnyPattern(`${objectiveText} ${endpointText} ${designText} ${intentText}`, [
+      /primary endpoint|safety|cardiac|neurologic|imaging|progression|response|objective response|monitoring|remote|home health|endpoint evaluation/,
+    ]),
+  }
+}
+
+function buildProtocolGuardrailAssessment(study: StudyForm): ProtocolGuardrailAssessment {
+  const profile = getResolvedProtocolGuardrailProfile(study)
+  const objectiveCount =
+    (study.primaryObjective || "").trim() ? 1 + splitStructuredEditorItems(study.secondaryObjectives || "").length : 0
+  const endpointCount = splitStructuredEditorItems(getResolvedOutcomes(study)).length
+  const eligibilityCount = splitStructuredEditorItems(study.eligibility || "").length
+  const hasTimeline = Boolean((study.timeline || "").trim())
+  const hasComparator = Boolean(((study.topComparator || "").trim() || (study.comparator || "").trim()))
+  const hasExploratoryLanguage = /exploratory|biomarker|subgroup|omics|mechanistic/i.test(getResolvedOutcomes(study))
+  const maxEndpointTarget = Math.max(2, Math.min(10, Math.max(1, objectiveCount || 1) * 2))
+  const lateStageOrPostMarketing = /phase 3|phase 4|post-marketing|lifecycle/i.test(study.developmentStage || "")
+  const specialAssessmentSignals = getSpecialAssessmentSignals(study)
+  const checks: ProtocolGuardrailCheck[] = []
+
+  if (profile === "practice_informing_ped") {
+    checks.push({
+      id: "stage-fit",
+      label: "Development-stage fit",
+      status: lateStageOrPostMarketing ? "aligned" : "needs_justification",
+      finding: lateStageOrPostMarketing
+        ? "The selected development stage fits late-stage or post-marketing practice-informing use."
+        : "Practice-informing PED-style discipline usually fits Phase 3/4 or post-marketing concepts, not early exploratory development.",
+      action: lateStageOrPostMarketing
+        ? "Continue with late-stage practice-informing assumptions."
+        : "Confirm the development stage or switch to a lighter guardrail profile if this is not late-stage/post-marketing.",
+    })
+    checks.push({
+      id: "phase3-safety",
+      label: "Template applicability",
+      status:
+        study.phase3SafetyDataAvailable === "yes"
+          ? "aligned"
+          : study.phase3SafetyDataAvailable === "no"
+            ? "consider_simplifying"
+            : "needs_justification",
+      finding:
+        study.phase3SafetyDataAvailable === "yes"
+          ? "Phase 3 safety-data availability is confirmed for practice-informing PED-style discipline."
+          : study.phase3SafetyDataAvailable === "no"
+            ? "The PED template should not be treated as directly applicable if Phase 3 safety data are not available."
+            : "Phase 3 safety-data availability is not confirmed yet.",
+      action:
+        study.phase3SafetyDataAvailable === "yes"
+          ? "Continue using the practice-informing guardrail profile."
+          : "Confirm safety-data availability, or keep the profile as directional lean-design guidance only.",
+    })
+  }
+
+  checks.push({
+    id: "objectives",
+    label: "Objective count",
+    status: objectiveCount === 0 ? "needs_justification" : objectiveCount <= 5 ? "aligned" : "consider_simplifying",
+    finding:
+      objectiveCount === 0
+        ? "No research objective package is entered yet."
+        : `${objectiveCount} objective${objectiveCount === 1 ? "" : "s"} currently captured.`,
+    action:
+      objectiveCount === 0
+        ? "Draft the primary objective before running downstream steps."
+        : objectiveCount <= 5
+          ? "Keep the objective package focused."
+          : "Trim secondary objectives or document why each additional objective is decision-critical.",
+  })
+
+  checks.push({
+    id: "endpoints",
+    label: "Endpoint focus",
+    status: endpointCount === 0 ? "needs_justification" : endpointCount <= maxEndpointTarget ? "aligned" : "consider_simplifying",
+    finding:
+      endpointCount === 0
+        ? "No endpoint package is entered yet."
+        : `${endpointCount} endpoint or assessment item${endpointCount === 1 ? "" : "s"} captured; target is about ${maxEndpointTarget} for the current objective count.`,
+    action:
+      endpointCount === 0
+        ? "Add one primary endpoint and only the most important supporting endpoints."
+        : endpointCount <= maxEndpointTarget
+          ? "Endpoint burden looks proportionate."
+          : "Ask AI for a lower-burden endpoint package, or justify endpoints that materially change interpretation.",
+  })
+
+  checks.push({
+    id: "duration",
+    label: "Duration and timing",
+    status: hasTimeline ? "aligned" : "needs_justification",
+    finding: hasTimeline ? "Timeline or follow-up duration is captured." : "Study duration and follow-up timing are not yet explicit.",
+    action: hasTimeline
+      ? "Keep endpoint timing consistent with the timeline."
+      : "Add enrollment, treatment/observation, follow-up, or evidence-window timing.",
+  })
+
+  checks.push({
+    id: "comparator",
+    label: "Comparator discipline",
+    status: hasComparator || study.category !== "interventional" ? "aligned" : "needs_justification",
+    finding:
+      hasComparator || study.category !== "interventional"
+        ? "Comparator or benchmark logic is present."
+        : "Comparator/control logic is still missing for an interventional concept.",
+    action:
+      hasComparator || study.category !== "interventional"
+        ? "Ensure the comparator is consistent across objectives, endpoints, PICO, and schema."
+        : "Add a relevant comparator, control, or explicit benchmark before generating decision-facing outputs.",
+  })
+
+  checks.push({
+    id: "exploratory",
+    label: "Exploratory burden",
+    status: hasExploratoryLanguage ? "needs_justification" : "aligned",
+    finding: hasExploratoryLanguage
+      ? "Exploratory, biomarker, subgroup, or mechanistic language appears in the endpoint package."
+      : "No obvious exploratory endpoint burden detected.",
+    action: hasExploratoryLanguage
+      ? "Keep only exploratory items that are decision-critical and label them clearly as non-claim-supporting."
+      : "Avoid adding exploratory readouts unless they clearly support the study decision.",
+  })
+
+  checks.push({
+    id: "pro-coa",
+    label: "PRO / COA discipline",
+    status: !specialAssessmentSignals.hasPro
+      ? "aligned"
+      : specialAssessmentSignals.proJustified
+        ? "aligned"
+        : "needs_justification",
+    finding: !specialAssessmentSignals.hasPro
+      ? "No PRO or COA burden is currently visible."
+      : specialAssessmentSignals.proJustified
+        ? "PRO or COA language is present and appears tied to patient-relevant, tolerability, HTA, or practice interpretation."
+        : "PRO or COA language is present, but its decision-critical role is not obvious from the current objective or endpoint package.",
+    action: !specialAssessmentSignals.hasPro
+      ? "Add PRO/COA only if symptoms, functioning, treatment burden, QoL, tolerability, HTA, or practice interpretation need direct support."
+      : specialAssessmentSignals.proJustified
+        ? "Keep the PRO/COA set short and define the exact instrument/timepoint later in the synopsis or protocol."
+        : "Either connect PRO/COA to an objective or endpoint, or remove it to avoid low-value data collection.",
+  })
+
+  checks.push({
+    id: "pk-pd",
+    label: "PK / PD and exposure-response",
+    status: !specialAssessmentSignals.hasPkPd
+      ? "aligned"
+      : specialAssessmentSignals.pkPdJustified
+        ? "aligned"
+        : "consider_simplifying",
+    finding: !specialAssessmentSignals.hasPkPd
+      ? "No PK/PD or exposure-response collection is currently visible."
+      : specialAssessmentSignals.pkPdJustified
+        ? "PK/PD or exposure-response language appears tied to dose, safety, bridging, or special-population logic."
+        : "PK/PD or exposure-response language is present without a clear dose, safety, bridging, or special-population rationale.",
+    action: !specialAssessmentSignals.hasPkPd
+      ? "Do not add PK/PD by default for practice-informing or pragmatic studies."
+      : specialAssessmentSignals.pkPdJustified
+        ? "Keep PK/PD sampling sparse and aligned to the specific dose, safety, or bridging question."
+        : "Remove PK/PD collection or document why it is essential for the decision the study should support.",
+  })
+
+  checks.push({
+    id: "biomarkers",
+    label: "Biomarkers / biospecimens",
+    status: !specialAssessmentSignals.hasBiomarker
+      ? "aligned"
+      : specialAssessmentSignals.biomarkerJustified
+        ? "aligned"
+        : "needs_justification",
+    finding: !specialAssessmentSignals.hasBiomarker
+      ? "No biomarker or biospecimen collection burden is currently visible."
+      : specialAssessmentSignals.biomarkerJustified
+        ? "Biomarker language appears connected to population definition, stratification, predictive/prognostic interpretation, or subgroup logic."
+        : "Biomarker or biospecimen language is present, but its role in the decision logic is not explicit.",
+    action: !specialAssessmentSignals.hasBiomarker
+      ? "Add biomarkers only if they define eligibility, stratification, endpoint interpretation, safety risk, or a prespecified decision."
+      : specialAssessmentSignals.biomarkerJustified
+        ? "Keep biomarker collection limited to the prespecified decision or stratification need."
+        : "Clarify the biomarker decision role or remove the collection to reduce burden.",
+  })
+
+  checks.push({
+    id: "special-assessments",
+    label: "Special assessments and visit burden",
+    status: !specialAssessmentSignals.hasIntensiveAssessments
+      ? "aligned"
+      : specialAssessmentSignals.intensiveAssessmentsJustified
+        ? "aligned"
+        : "needs_justification",
+    finding: !specialAssessmentSignals.hasIntensiveAssessments
+      ? "No obvious special-assessment burden is visible."
+      : specialAssessmentSignals.intensiveAssessmentsJustified
+        ? "Special assessments appear connected to endpoint evaluation, safety monitoring, or operational feasibility."
+        : "Special assessments appear in the concept without a clear endpoint, safety, or feasibility rationale.",
+    action: !specialAssessmentSignals.hasIntensiveAssessments
+      ? "Avoid adding imaging, ECG, lab panels, wearables, or remote checks unless they support endpoints, safety, or feasibility."
+      : specialAssessmentSignals.intensiveAssessmentsJustified
+        ? "Keep timing lean and avoid duplicative assessments across visits."
+        : "Remove or consolidate special assessments before generating the SoA.",
+  })
+
+  checks.push({
+    id: "eligibility",
+    label: "Eligibility burden",
+    status: eligibilityCount <= 12 ? "aligned" : eligibilityCount <= 18 ? "needs_justification" : "consider_simplifying",
+    finding:
+      eligibilityCount === 0
+        ? "Eligibility criteria are not yet structured."
+        : `${eligibilityCount} eligibility item${eligibilityCount === 1 ? "" : "s"} captured.`,
+    action:
+      eligibilityCount <= 12
+        ? "Keep criteria inclusive, verifiable, and directly tied to safety or interpretability."
+        : "Review whether restrictive criteria are necessary, non-duplicative, and verifiable during screening.",
+  })
+
+  return {
+    profile,
+    label: PROTOCOL_GUARDRAIL_LABELS[profile],
+    summary:
+      profile === "none"
+        ? "No additional protocol-template discipline is active."
+        : profile === "practice_informing_ped"
+          ? "Late-stage practice-informing discipline is active: focused objectives, lean endpoints, explicit duration, simple design, and minimized data collection."
+          : "Lean decision-evidence discipline is active: keep only evidence elements that materially support the stated downstream decision.",
+    checks,
+  }
+}
+
 function buildStudyTypeReviewNotice(
   scope: StudyTypeReviewNotice["scope"],
   category: string,
@@ -4041,6 +5077,8 @@ function buildStudySchemaFingerprint(study: StudyForm) {
     study.category,
     study.subcategory,
     study.developmentStage,
+    getResolvedProtocolGuardrailProfile(study),
+    study.phase3SafetyDataAvailable,
     getStrategicObjectiveLabel(study),
     getPrimaryEvidenceUseIntent(study),
     study.therapeuticArea,
@@ -4051,9 +5089,12 @@ function buildStudySchemaFingerprint(study: StudyForm) {
     study.primaryObjective,
     study.designOverview,
     study.population,
+    study.eligibility,
     getResolvedOutcomes(study),
     study.timeline,
+    study.geography,
     study.sampleSize,
+    study.operationalNotes,
   ]
     .join("|")
     .toLowerCase()
@@ -4073,9 +5114,14 @@ function getStudySchemaMissing(study: StudyForm) {
 }
 
 function inferStudySchemaType(study: StudyForm) {
+  return getSchemaTypeForDesignPattern(inferStudySchemaDesignPattern(study))
+}
+
+function inferStudySchemaDesignPattern(study: StudyForm): Exclude<StudySchemaDesignPattern, "auto"> {
   const subtype = (study.subcategory || "").toLowerCase()
   const category = (study.category || "").toLowerCase()
   const strategicText = `${getStrategicObjectiveLabel(study)} ${getPrimaryEvidenceUseIntent(study)} ${study.designOverview}`.toLowerCase()
+  const designText = `${subtype} ${strategicText} ${study.primaryObjective} ${study.outcomes}`.toLowerCase()
 
   if (category === "evidence-synthesis") {
     return "evidence_synthesis"
@@ -4089,18 +5135,66 @@ function inferStudySchemaType(study: StudyForm) {
     category === "non-interventional" &&
     (/secondary/.test(subtype) || /real world|database|claims|ehr|emr|registry/.test(strategicText))
   ) {
-    return "rwe_secondary_database"
+    return "cohort_rwe"
   }
 
   if (category === "non-interventional") {
-    return "observational"
+    return "cohort_rwe"
   }
 
-  if (/adaptive|basket|umbrella|non-randomized/.test(subtype)) {
+  if (/platform|master protocol|umbrella|basket/.test(designText)) {
+    return "platform_master_protocol"
+  }
+
+  if (/adaptive|interim|futility|enrichment|sample[- ]?size re|dose[- ]?selection|arm drop|drop arm/.test(designText)) {
+    return "adaptive"
+  }
+
+  if (/cross[- ]?over|crossover|washout|sequence/.test(designText)) {
+    return "crossover"
+  }
+
+  if (/substudy|sub-study|pk\/pd|pharmacokinetic|pharmacodynamic|biomarker|biospecimen|imaging substudy/.test(designText)) {
+    return "substudy_enabled"
+  }
+
+  if (/single[- ]?arm|open[- ]?label single|one arm/.test(designText) || !((study.topComparator || study.comparator || "").trim())) {
+    return "single_arm"
+  }
+
+  return "parallel_group"
+}
+
+function getSchemaTypeForDesignPattern(pattern: StudySchemaDesignPattern) {
+  if (pattern === "auto") {
+    return "interventional"
+  }
+
+  if (pattern === "cohort_rwe") {
+    return "rwe_secondary_database"
+  }
+
+  if (pattern === "evidence_synthesis") {
+    return "evidence_synthesis"
+  }
+
+  if (pattern === "non_clinical") {
+    return "non_clinical"
+  }
+
+  if (["platform_master_protocol", "adaptive", "crossover", "substudy_enabled"].includes(pattern)) {
     return "complex_interventional"
   }
 
   return "interventional"
+}
+
+function getResolvedStudySchemaDesignPattern(study: StudyForm, schema?: Pick<StudySchemaForm, "designPattern">) {
+  return schema?.designPattern && schema.designPattern !== "auto" ? schema.designPattern : inferStudySchemaDesignPattern(study)
+}
+
+function getStudySchemaPatternOption(pattern: StudySchemaDesignPattern) {
+  return STUDY_SCHEMA_PATTERN_OPTIONS.find((option) => option.value === pattern) || STUDY_SCHEMA_PATTERN_OPTIONS[0]
 }
 
 function getStudySchemaLimits(detailLevel: StudySchemaDetailLevel) {
@@ -4155,11 +5249,15 @@ function shapeGeneratedStudySchema(
   generated: Partial<Pick<StudySchemaForm, "title" | "schemaType" | "orientation" | "detailLevel" | "lanes" | "nodes" | "edges" | "notes">>,
 ) {
   const title = generated.title || current.title || `${study.studyTitle || "Study concept"} schema`
-  const schemaType = generated.schemaType || inferStudySchemaType(study)
+  const designPattern = getResolvedStudySchemaDesignPattern(study, current)
+  const schemaType = generated.schemaType || getSchemaTypeForDesignPattern(designPattern)
   const fingerprint = buildStudySchemaFingerprint(study)
   const fallback = buildStudySchemaFromStudy(study, {
     orientation: current.orientation,
     detailLevel: current.detailLevel,
+    designPattern: current.designPattern,
+    useCase: current.useCase,
+    contentBlocks: current.contentBlocks,
     iterationPrompt: current.iterationPrompt,
     theme: current.theme,
   })
@@ -4173,6 +5271,7 @@ function shapeGeneratedStudySchema(
       ...fallback,
       title,
       schemaType,
+      designPattern: current.designPattern,
       notes: condensedNotes,
       generatedAt: new Date().toISOString(),
       provenance: getStudySchemaFallbackProvenance(current.provenance, true),
@@ -4186,6 +5285,7 @@ function shapeGeneratedStudySchema(
     ...generated,
     title,
     schemaType,
+    designPattern: current.designPattern,
     iterationPrompt: current.iterationPrompt,
     generatedAt: new Date().toISOString(),
     provenance: "ai_generated",
@@ -4198,6 +5298,7 @@ function shapeGeneratedStudySchema(
       ...fallback,
       title,
       schemaType,
+      designPattern: current.designPattern,
       notes: condensedNotes,
       generatedAt: new Date().toISOString(),
       provenance: getStudySchemaFallbackProvenance(current.provenance, true),
@@ -4215,10 +5316,13 @@ function shapeGeneratedStudySchema(
 function buildSimpleStudySchemaFromStudy(
   study: StudyForm,
   schemaType: string,
+  designPattern: Exclude<StudySchemaDesignPattern, "auto">,
   orientation: StudySchemaOrientation,
   theme: StudySchemaTheme,
   title: string,
   iterationPrompt: string,
+  useCase: StudySchemaUseCase,
+  contentBlocks: StudySchemaContentBlock[],
 ) {
   const disease = getSelectedDiseaseLabel(study) || getResolvedIndication(study) || "Target condition"
   const intervention = study.topIntervention || study.intervention || "Study intervention"
@@ -4272,15 +5376,41 @@ function buildSimpleStudySchemaFromStudy(
       "Use a higher detail setting only if you need explicit arm branching, follow-up, or interim decision points.",
     )
   } else if (schemaType === "complex_interventional") {
+    const patternOption = getStudySchemaPatternOption(designPattern)
+    const isPlatform = designPattern === "platform_master_protocol"
+    const isAdaptive = designPattern === "adaptive"
+    const isCrossover = designPattern === "crossover"
+    const isSubstudy = designPattern === "substudy_enabled"
     addLane("setup", "Study setup", "Eligibility and assignment into the design.")
     addLane("execution", "Cohorts and evidence", "Main cohorts, treatment logic, and core evidence capture.")
     addLane("readout", "Readout", "Integrated analysis and intended decision use.")
 
-    addNode("concept", "setup", "Complex study concept", `${study.subcategory || "Adaptive / multi-cohort design"} in ${disease}`, "start", 0)
-    addNode("assignment", "setup", "Cohort logic", study.designOverview || "Biomarker, regimen, or cohort rule set", "decision", 1)
-    addNode("cohorts", "execution", "Active cohorts or arms", `${intervention} and comparator strategy`, "cohort", 2)
-    addNode("assessment", "execution", "Key evidence package", endpoint, "assessment", 3)
-    addNode("readout", "readout", "Integrated readout", evidenceIntent, "output", 4)
+    addNode("concept", "setup", patternOption.label, `${study.subcategory || "Complex design"} in ${disease}`, "start", 0)
+    addNode(
+      "assignment",
+      "setup",
+      isCrossover ? "Sequence assignment" : isSubstudy ? "Main-study entry" : isPlatform ? "Master protocol entry" : "Adaptation logic",
+      study.designOverview || patternOption.description,
+      "decision",
+      1,
+    )
+    addNode(
+      "cohorts",
+      "execution",
+      isCrossover ? "Treatment periods" : isSubstudy ? "Main flow + optional substudies" : isPlatform ? "Active platform arms" : "Active arms or cohorts",
+      isCrossover ? `${intervention} / ${comparator || "alternate sequence"}` : `${intervention} and comparator strategy`,
+      "cohort",
+      2,
+    )
+    addNode(
+      "assessment",
+      "execution",
+      isAdaptive ? "Interim + final evidence package" : isCrossover ? "Period-specific assessments" : "Key evidence package",
+      endpoint,
+      "assessment",
+      3,
+    )
+    addNode("readout", "readout", isSubstudy ? "Integrated main + substudy readout" : "Integrated readout", evidenceIntent, "output", 4)
 
     addEdge("concept", "assignment")
     addEdge("assignment", "cohorts")
@@ -4288,8 +5418,8 @@ function buildSimpleStudySchemaFromStudy(
     addEdge("assessment", "readout")
 
     notes.push(
-      "This is a compressed view of a complex interventional design. Branching is summarized rather than fully expanded.",
-      "If you need named cohorts, biomarker pathways, or adaptive decision nodes, switch to a higher detail level.",
+      `This uses the ${patternOption.label.toLowerCase()} schema pattern, compressed to one slide.`,
+      "Use a higher detail setting if you need explicit decision rules, sequences, cohort branches, or substudy modules.",
     )
   } else if (schemaType === "rwe_secondary_database") {
     addLane("source", "Data source", "The secondary data asset and feasibility logic.")
@@ -4376,8 +5506,11 @@ function buildSimpleStudySchemaFromStudy(
   return normalizeStudySchema({
     title,
     schemaType,
+    designPattern,
     orientation,
     detailLevel: "simple",
+    useCase,
+    contentBlocks,
     iterationPrompt,
     lanes,
     nodes,
@@ -4393,11 +5526,16 @@ function buildSimpleStudySchemaFromStudy(
 
 function buildStudySchemaFromStudy(
   study: StudyForm,
-  overrides?: Partial<Pick<StudySchemaForm, "orientation" | "detailLevel" | "iterationPrompt" | "theme">>,
+  overrides?: Partial<
+    Pick<StudySchemaForm, "orientation" | "detailLevel" | "designPattern" | "iterationPrompt" | "theme" | "useCase" | "contentBlocks">
+  >,
 ): StudySchemaForm {
-  const schemaType = inferStudySchemaType(study)
+  const designPattern = getResolvedStudySchemaDesignPattern(study, { designPattern: overrides?.designPattern || "auto" })
+  const schemaType: string = getSchemaTypeForDesignPattern(designPattern)
   const orientation = overrides?.orientation || "horizontal"
   const detailLevel = overrides?.detailLevel || "simple"
+  const useCase = overrides?.useCase || "executive_slide"
+  const contentBlocks = overrides?.contentBlocks?.length ? overrides.contentBlocks : STUDY_SCHEMA_USE_CASE_PRESETS[useCase]
   const theme = {
     ...DEFAULT_STUDY_SCHEMA_THEME,
     ...(overrides?.theme || {}),
@@ -4412,7 +5550,17 @@ function buildStudySchemaFromStudy(
   const title = `${study.studyTitle || "Study concept"} schema`
 
   if (detailLevel === "simple") {
-    return buildSimpleStudySchemaFromStudy(study, schemaType, orientation, theme, title, overrides?.iterationPrompt || "")
+    return buildSimpleStudySchemaFromStudy(
+      study,
+      schemaType,
+      designPattern,
+      orientation,
+      theme,
+      title,
+      overrides?.iterationPrompt || "",
+      useCase,
+      contentBlocks,
+    )
   }
 
   const lanes: StudySchemaLane[] = []
@@ -4454,9 +5602,7 @@ function buildStudySchemaFromStudy(
     addNode("treatment", "arms", "On-treatment period", study.timeline || "Protocol-defined treatment duration", "milestone", 4)
     addNode("endpoint-assessment", "assessment", endpoint, objective, "assessment", 5, 0)
 
-    if (detailLevel !== "simple") {
-      addNode("follow-up", "assessment", "Safety and follow-up", "Durability, adverse events, and longer-term outcomes", "milestone", 6, 0)
-    }
+    addNode("follow-up", "assessment", "Safety and follow-up", "Durability, adverse events, and longer-term outcomes", "milestone", 6, 0)
 
     addNode(
       "analysis",
@@ -4464,10 +5610,10 @@ function buildStudySchemaFromStudy(
       "Primary analysis",
       `${evidenceIntent} · ${study.sampleSize || "sample size pending"}`,
       "analysis",
-      detailLevel === "simple" ? 6 : 7,
+      7,
       0,
     )
-    addNode("decision-use", "readout", "Decision use", evidenceIntent, "output", detailLevel === "simple" ? 7 : 8, 0)
+    addNode("decision-use", "readout", "Decision use", evidenceIntent, "output", 8, 0)
 
     addEdge("concept", "screening")
     addEdge("screening", "allocation")
@@ -4476,12 +5622,8 @@ function buildStudySchemaFromStudy(
     addEdge("intervention-arm", "treatment")
     addEdge("comparator-arm", "treatment")
     addEdge("treatment", "endpoint-assessment")
-    if (detailLevel !== "simple") {
-      addEdge("endpoint-assessment", "follow-up")
-      addEdge("follow-up", "analysis")
-    } else {
-      addEdge("endpoint-assessment", "analysis")
-    }
+    addEdge("endpoint-assessment", "follow-up")
+    addEdge("follow-up", "analysis")
     addEdge("analysis", "decision-use")
 
     notes.push(
@@ -4490,21 +5632,63 @@ function buildStudySchemaFromStudy(
       "If the arm structure or follow-up package needs more detail, regenerate with a request for more cohorts, visits, or milestone nodes.",
     )
   } else if (schemaType === "complex_interventional") {
+    const patternOption = getStudySchemaPatternOption(designPattern)
+    const isPlatform = designPattern === "platform_master_protocol"
+    const isAdaptive = designPattern === "adaptive"
+    const isCrossover = designPattern === "crossover"
+    const isSubstudy = designPattern === "substudy_enabled"
     addLane("entry", "Entry and assignment", "Eligibility, biomarker or cohort logic, and allocation into the design.")
-    addLane("cohorts", "Cohorts or arms", "Parallel cohorts, regimen paths, or adaptive branches.")
-    addLane("assessment", "Assessments and adaptations", "Outcome capture, interim review, and confirmation logic.")
+    addLane(
+      "cohorts",
+      isCrossover ? "Sequences and periods" : isSubstudy ? "Main study and modules" : "Cohorts or arms",
+      isCrossover ? "Treatment sequences, periods, and washout logic." : "Parallel cohorts, regimen paths, or adaptive branches.",
+    )
+    addLane(
+      "assessment",
+      isAdaptive ? "Assessments and adaptations" : "Assessments and follow-up",
+      isAdaptive ? "Outcome capture, interim review, and confirmation logic." : "Endpoint capture and key evidence modules.",
+    )
     addLane("readout", "Integrated readout", "Analysis package and evidentiary destination.")
 
-    addNode("concept", "entry", "Complex study concept", `${study.subcategory || "Adaptive / multi-cohort design"} in ${disease}`, "start", 0)
-    addNode("entry", "entry", "Eligibility and cohort logic", study.population || lineOfTherapy, "screening", 1)
-    addNode("assignment", "entry", "Allocation / cohort assignment", study.designOverview || "Biomarker, regimen, or cohort rule set", "decision", 2)
-    addNode("cohort-a", "cohorts", intervention, "Primary experimental cohort", "cohort", 3, 0)
-    addNode("cohort-b", "cohorts", comparator, "Reference or alternate cohort", "cohort", 3, 1)
-    if (detailLevel !== "simple") {
-      addNode("cohort-c", "cohorts", "Expansion or adaptive cohort", "Optional cohort branch", "cohort", 3, 2)
-    }
-    addNode("assessment", "assessment", endpoint, "Primary efficacy and core safety capture", "assessment", 4, 0)
-    addNode("interim", "assessment", "Interim adaptation review", "Expansion, graduation, or drop logic", "decision", 5, detailLevel === "detailed" ? 1 : 0)
+    addNode("concept", "entry", patternOption.label, `${study.subcategory || "Complex design"} in ${disease}`, "start", 0)
+    addNode("entry", "entry", isPlatform ? "Master protocol entry" : "Eligibility and entry logic", study.population || lineOfTherapy, "screening", 1)
+    addNode(
+      "assignment",
+      "entry",
+      isCrossover ? "Sequence assignment" : isSubstudy ? "Main-study assignment" : isPlatform ? "Arm entry / exit rules" : "Allocation / adaptation rule",
+      study.designOverview || patternOption.description,
+      "decision",
+      2,
+    )
+    addNode("cohort-a", "cohorts", intervention, isCrossover ? "Sequence A / period path" : "Primary experimental path", "cohort", 3, 0)
+    addNode("cohort-b", "cohorts", comparator || (isCrossover ? "Alternate sequence" : "Reference path"), isCrossover ? "Sequence B / period path" : "Reference or alternate path", "cohort", 3, 1)
+    addNode(
+      "cohort-c",
+      "cohorts",
+      isSubstudy ? "Optional substudy module" : isPlatform ? "New / graduating arm" : isAdaptive ? "Selected / dropped arm logic" : "Additional cohort logic",
+      isSubstudy ? "PK/PD, biomarker, imaging, PRO, or regional module" : "Optional branch",
+      "cohort",
+      3,
+      2,
+    )
+    addNode(
+      "assessment",
+      "assessment",
+      isCrossover ? "Period-specific endpoints" : "Key evidence package",
+      endpoint,
+      "assessment",
+      4,
+      0,
+    )
+    addNode(
+      "interim",
+      "assessment",
+      isAdaptive ? "Interim adaptation review" : isCrossover ? "Washout / carryover control" : isSubstudy ? "Substudy integration checkpoint" : "Protocol decision checkpoint",
+      isAdaptive ? "Futility, enrichment, dose/arm selection, or sample-size update" : "Decision-critical checkpoint",
+      "decision",
+      5,
+      detailLevel === "detailed" ? 1 : 0,
+    )
     addNode("analysis", "readout", "Integrated analysis", `${evidenceIntent} at ${study.developmentStage || "planned stage"}`, "analysis", 6, 0)
     addNode("decision-use", "readout", "Decision use", evidenceIntent, "output", 7, 0)
 
@@ -4512,10 +5696,8 @@ function buildStudySchemaFromStudy(
     addEdge("entry", "assignment")
     addEdge("assignment", "cohort-a", "Cohort A")
     addEdge("assignment", "cohort-b", "Cohort B")
-    if (detailLevel !== "simple") {
-      addEdge("assignment", "cohort-c", "Adaptive cohort", "dashed")
-      addEdge("cohort-c", "assessment", "", "dashed")
-    }
+    addEdge("assignment", "cohort-c", "Adaptive cohort", "dashed")
+    addEdge("cohort-c", "assessment", "", "dashed")
     addEdge("cohort-a", "assessment")
     addEdge("cohort-b", "assessment")
     addEdge("assessment", "interim")
@@ -4523,8 +5705,8 @@ function buildStudySchemaFromStudy(
     addEdge("analysis", "decision-use")
 
     notes.push(
-      "This schema treats the design as a branching, multi-cohort or adaptive interventional study rather than a simple two-arm flow.",
-      "Use regeneration instructions if you need named cohorts, biomarker branches, or explicit seamless phase transitions.",
+      `This schema uses the ${patternOption.label.toLowerCase()} pattern rather than a generic two-arm flow.`,
+      "Use regeneration instructions if you need named arms, decision rules, sequences, biomarker branches, or explicit substudy modules.",
       `The readout is positioned for ${evidenceIntent.toLowerCase()}, so complexity should be justified by the intended decision.`,
     )
   } else if (schemaType === "rwe_secondary_database") {
@@ -4540,10 +5722,8 @@ function buildStudySchemaFromStudy(
     addNode("comparison", "cohort", "Comparator cohort", comparator, "cohort", 3, 1)
     addNode("adjustment", "analysis", "Confounding control", "Matching, weighting, or adjustment strategy", "analysis", 4, 0)
     addNode("outcomes", "analysis", "Outcome ascertainment", endpoint, "assessment", 5, 0)
-    if (detailLevel !== "simple") {
-      addNode("sensitivity", "analysis", "Sensitivity analyses", "Alternative definitions and robustness checks", "milestone", 6, 1)
-    }
-    addNode("readout", "output", "RWE readout", `${evidenceIntent} and stakeholder interpretation`, "output", detailLevel === "simple" ? 6 : 7, 0)
+    addNode("sensitivity", "analysis", "Sensitivity analyses", "Alternative definitions and robustness checks", "milestone", 6, 1)
+    addNode("readout", "output", "RWE readout", `${evidenceIntent} and stakeholder interpretation`, "output", 7, 0)
 
     addEdge("question", "database")
     addEdge("database", "eligibility")
@@ -4552,12 +5732,8 @@ function buildStudySchemaFromStudy(
     addEdge("treated", "adjustment")
     addEdge("comparison", "adjustment")
     addEdge("adjustment", "outcomes")
-    if (detailLevel !== "simple") {
-      addEdge("outcomes", "sensitivity", "", "dashed")
-      addEdge("sensitivity", "readout")
-    } else {
-      addEdge("outcomes", "readout")
-    }
+    addEdge("outcomes", "sensitivity", "", "dashed")
+    addEdge("sensitivity", "readout")
 
     notes.push(
       "This schema is framed for secondary database RWE rather than a site-executed study.",
@@ -4644,8 +5820,11 @@ function buildStudySchemaFromStudy(
   return normalizeStudySchema({
     title,
     schemaType,
+    designPattern: overrides?.designPattern || "auto",
     orientation,
     detailLevel,
+    useCase,
+    contentBlocks,
     iterationPrompt: overrides?.iterationPrompt || "",
     lanes,
     nodes,
@@ -4681,6 +5860,69 @@ function wrapSvgText(text: string, maxChars: number) {
   return lines.slice(0, 3)
 }
 
+function compactSchemaText(value: string, fallback: string, maxLength = 110) {
+  const normalized = value.replace(/\s+/g, " ").trim()
+  const text = normalized || fallback
+
+  if (text.length <= maxLength) {
+    return text
+  }
+
+  const clipped = text.slice(0, maxLength)
+  const lastBreak = Math.max(clipped.lastIndexOf(";"), clipped.lastIndexOf(","), clipped.lastIndexOf(" "))
+
+  return `${clipped.slice(0, lastBreak > 48 ? lastBreak : maxLength).trim()}...`
+}
+
+function compactSchemaLines(value: string, maxLines = 3, maxLineLength = 78) {
+  return value
+    .split("\n")
+    .map((line) => compactSchemaText(line, "", maxLineLength))
+    .filter(Boolean)
+    .slice(0, maxLines)
+    .join("\n")
+}
+
+function buildStudySchemaDesignSummary(study: StudyForm, schemaType = inferStudySchemaType(study)) {
+  const designOverview = splitStructuredEditorItems(study.designOverview || "").join("; ")
+  const subtype = study.subcategory || study.category || "Study design"
+  const stage = study.developmentStage || ""
+
+  if (designOverview.trim()) {
+    return compactSchemaText(designOverview, subtype, 118)
+  }
+
+  if (schemaType === "interventional" || schemaType === "complex_interventional") {
+    return uniqueItemsCaseInsensitive([stage, subtype]).filter(Boolean).join(", ") || "Interventional study design"
+  }
+
+  if (schemaType === "rwe_secondary_database") {
+    return subtype || "Secondary data cohort design"
+  }
+
+  if (schemaType === "evidence_synthesis") {
+    return subtype || "Evidence synthesis method"
+  }
+
+  return uniqueItemsCaseInsensitive([stage, subtype]).filter(Boolean).join(", ") || "Study methodology"
+}
+
+function buildStudySchemaFlowDesignLabel(study: StudyForm, schemaType = inferStudySchemaType(study)) {
+  const designSummary = buildStudySchemaDesignSummary(study, schemaType)
+  const explicitParts = [
+    study.developmentStage,
+    study.subcategory,
+    /random/i.test(designSummary) ? "randomized" : "",
+    /\bdouble[- ]blind\b/i.test(designSummary) ? "double-blind" : "",
+    /\bopen[- ]label\b/i.test(designSummary) ? "open-label" : "",
+    /\bnon[- ]inferiority|NI\b/i.test(designSummary) ? "NI" : "",
+    /\bsuperiority\b/i.test(designSummary) ? "superiority" : "",
+  ].filter(Boolean)
+  const compactParts = uniqueItemsCaseInsensitive(explicitParts).slice(0, 4).join(", ")
+
+  return compactSchemaText(compactParts || designSummary, designSummary, 74)
+}
+
 function getStudySchemaNodeStyle(kind: StudySchemaNodeKind, theme: StudySchemaTheme) {
   if (kind === "start" || kind === "output") {
     return { fill: theme.accent, stroke: theme.accent, textFill: "#FFFFFF", strokeDasharray: "" }
@@ -4707,6 +5949,7 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
   }
 
   const schemaType = schema.schemaType || inferStudySchemaType(study)
+  const designPattern = getResolvedStudySchemaDesignPattern(study, schema)
   const detailLevel = schema.detailLevel || "simple"
   const disease = getSelectedDiseaseLabel(study) || getResolvedIndication(study) || "Target condition"
   const intervention = study.topIntervention || study.intervention || "Study intervention"
@@ -4715,9 +5958,15 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
   const primaryEndpoint = splitItems(getResolvedOutcomes(study))[0] || "Primary endpoint to be confirmed"
   const evidenceIntent = getPrimaryEvidenceUseIntent(study) || "Decision use to be confirmed"
   const strategicObjective = getStrategicObjectiveLabel(study) || "Program intent to be confirmed"
+  const designSummary = buildStudySchemaDesignSummary(study, schemaType)
+  const flowDesignLabel = buildStudySchemaFlowDesignLabel(study, schemaType)
+  const selectedContentBlocks = schema.contentBlocks?.length
+    ? schema.contentBlocks
+    : STUDY_SCHEMA_USE_CASE_PRESETS[schema.useCase || "executive_slide"]
+  const hasContentBlock = (block: StudySchemaContentBlock) => selectedContentBlocks.includes(block)
   const width = 1180
-  const background = schema.theme.background || "#F8FBFF"
-  const markerId = `schema-arrow-${slugify(`${schema.title}-${schemaType}-${detailLevel}`)}`
+  const background = schema.theme.background || J_AND_J_STUDY_SCHEMA_THEME.background
+  const markerId = `schema-arrow-${slugify(`${schema.title}-${schemaType}-${designPattern}-${detailLevel}`)}`
 
   const hexToRgba = (hex: string, alpha: number) => {
     const normalized = hex.replace("#", "").trim()
@@ -4726,7 +5975,7 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
     const numeric = Number.parseInt(expanded, 16)
 
     if (Number.isNaN(numeric)) {
-      return `rgba(24, 100, 171, ${alpha})`
+      return `rgba(215, 25, 32, ${alpha})`
     }
 
     const red = (numeric >> 16) & 255
@@ -4794,6 +6043,42 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
     }
 
     if (schemaType === "complex_interventional") {
+      if (designPattern === "platform_master_protocol") {
+        return {
+          step1Label: "Master protocol",
+          step2Label: "Arm entry / exit",
+          groupLabel: "Platform arm",
+          analysisLabel: "Integrated readout",
+        }
+      }
+
+      if (designPattern === "adaptive") {
+        return {
+          step1Label: "Study setup",
+          step2Label: "Adaptation rule",
+          groupLabel: "Adaptive path",
+          analysisLabel: "Interim / final readout",
+        }
+      }
+
+      if (designPattern === "crossover") {
+        return {
+          step1Label: "Study setup",
+          step2Label: "Sequence assignment",
+          groupLabel: "Sequence",
+          analysisLabel: "Within-participant readout",
+        }
+      }
+
+      if (designPattern === "substudy_enabled") {
+        return {
+          step1Label: "Main study",
+          step2Label: "Module selection",
+          groupLabel: "Study module",
+          analysisLabel: "Integrated readout",
+        }
+      }
+
       return {
         step1Label: "Study setup",
         step2Label: "Cohort logic",
@@ -4811,12 +6096,20 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
   }
 
   const config = getConfig()
-  const palette = [schema.theme.accent, schema.theme.edge, "#64748B"]
-  const makeGroup = (header: string, title: string, body: string, color: string) => ({
+  const palette = [schema.theme.accent, schema.theme.edge, "#6B7280"]
+  const comparatorColor = "#6B7280"
+  const makeGroup = (
+    header: string,
+    title: string,
+    body: string,
+    color: string,
+    tone: "treatment" | "comparator" | "neutral" = "neutral",
+  ) => ({
     header,
     title: title.trim() || "TBD",
-    body: body.trim() || "Details to be confirmed",
+    body: body.trim(),
     color,
+    tone,
   })
 
   const groups = (() => {
@@ -4827,19 +6120,29 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
           study.designOverview || "Search, screening, and included studies",
           study.population || disease,
           palette[0],
+          "treatment",
         ),
       ]
     }
 
     if (schemaType === "rwe_secondary_database") {
-      const cards = [makeGroup("Exposure cohort", intervention, study.population || "Database-defined treatment cohort", palette[0])]
+      const cards = [
+        makeGroup(
+          "Exposure cohort",
+          intervention,
+          study.population || "Database-defined treatment cohort",
+          palette[0],
+          "treatment",
+        ),
+      ]
       if (comparator.trim()) {
         cards.push(
           makeGroup(
             "Comparator cohort",
             comparator,
-            study.designOverview || "Matched, weighted, or adjusted reference cohort",
-            palette[1],
+            "Matched, weighted, or adjusted reference cohort",
+            comparatorColor,
+            "comparator",
           ),
         )
       }
@@ -4847,54 +6150,116 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
     }
 
     if (schemaType === "observational") {
-      const cards = [makeGroup("Observed group", intervention, study.population || disease, palette[0])]
+      const cards = [makeGroup("Observed group", intervention, study.population || disease, palette[0], "treatment")]
       if (comparator.trim()) {
-        cards.push(makeGroup("Comparison group", comparator, study.designOverview || "Reference care pathway", palette[1]))
-      }
-      return cards
-    }
-
-    if (schemaType === "non_clinical") {
-      const cards = [makeGroup("Primary condition", intervention, study.designOverview || "Experimental condition", palette[0])]
-      if (comparator.trim()) {
-        cards.push(makeGroup("Reference condition", comparator, study.population || "Reference condition or control", palette[1]))
-      }
-      return cards
-    }
-
-    if (schemaType === "complex_interventional") {
-      const cards = [makeGroup("Experimental cohort", intervention, study.topLineOfTherapy || disease, palette[0])]
-      if (comparator.trim()) {
-        cards.push(makeGroup("Reference cohort", comparator, study.designOverview || "Comparator or anchor cohort", palette[1]))
-      }
-      if (detailLevel !== "simple") {
         cards.push(
           makeGroup(
-            "Adaptive cohort logic",
-            study.subcategory || "Expansion or biomarker-defined cohorts",
-            study.designOverview || "Adaptive or staged expansion path",
-            palette[2],
+            "Comparison group",
+            comparator,
+            "Reference care pathway",
+            comparatorColor,
+            "comparator",
           ),
         )
       }
       return cards
     }
 
-    const cards = [makeGroup("Experimental arm", intervention, study.topLineOfTherapy || disease, palette[0])]
+    if (schemaType === "non_clinical") {
+      const cards = [
+        makeGroup("Primary condition", intervention, study.designOverview || "Experimental condition", palette[0], "treatment"),
+      ]
+      if (comparator.trim()) {
+        cards.push(
+          makeGroup(
+            "Reference condition",
+            comparator,
+            study.population || "Reference condition or control",
+            comparatorColor,
+            "comparator",
+          ),
+        )
+      }
+      return cards
+    }
+
+    if (schemaType === "complex_interventional") {
+      const primaryHeader =
+        designPattern === "crossover"
+          ? "Sequence A"
+          : designPattern === "platform_master_protocol"
+            ? "Platform arm"
+            : designPattern === "substudy_enabled"
+              ? "Main study"
+              : "Experimental cohort"
+      const cards = [makeGroup(primaryHeader, intervention, study.topLineOfTherapy || disease, palette[0], "treatment")]
+      if (comparator.trim()) {
+        cards.push(
+          makeGroup(
+            designPattern === "crossover" ? "Sequence B" : designPattern === "platform_master_protocol" ? "Shared / reference arm" : "Reference cohort",
+            comparator,
+            designPattern === "crossover" ? "Alternate treatment order" : "Comparator or anchor cohort",
+            comparatorColor,
+            "comparator",
+          ),
+        )
+      }
+      if (detailLevel !== "simple") {
+        cards.push(
+          makeGroup(
+            designPattern === "adaptive"
+              ? "Adaptation checkpoint"
+              : designPattern === "platform_master_protocol"
+                ? "Arm entry / graduation"
+                : designPattern === "crossover"
+                  ? "Washout / period transition"
+                  : designPattern === "substudy_enabled"
+                    ? "Optional substudy module"
+                    : "Complex cohort logic",
+            study.subcategory || getStudySchemaPatternOption(designPattern).label,
+            study.designOverview || getStudySchemaPatternOption(designPattern).description,
+            palette[2],
+            "neutral",
+          ),
+        )
+      }
+      return cards
+    }
+
+    const cards = [makeGroup("Experimental arm", intervention, study.topLineOfTherapy || disease, palette[0], "treatment")]
     if (comparator.trim()) {
-      cards.push(makeGroup("Comparator arm", comparator, study.designOverview || "Reference treatment strategy", palette[1]))
+      cards.push(makeGroup("Comparator arm", comparator, "Reference treatment strategy", comparatorColor, "comparator"))
     }
     return cards
   })().slice(0, 3)
 
   const showExtendedDetail = detailLevel !== "simple"
+  const hasTimelineBand = hasContentBlock("timeline")
+  const panelContentBlocks = selectedContentBlocks.filter((block) => block !== "timeline")
+  const maxGroupBodyLines = detailLevel === "detailed" ? 3 : 2
+  const groupTextProfiles = groups.map((group) => {
+    const titleLines = wrapSvgText(group.title, 28).slice(0, 2)
+    const bodyLines = group.body ? wrapSvgText(group.body, 34).slice(0, maxGroupBodyLines) : []
+    const titleBottom = titleLines.length ? 62 + (titleLines.length - 1) * 20 + 8 : 62
+    const bodyBottom = bodyLines.length ? 92 + (bodyLines.length - 1) * 16 + 8 : titleBottom
+    const requiredHeight = Math.max(titleBottom, bodyBottom) + 18
+
+    return {
+      titleLines,
+      bodyLines,
+      requiredHeight,
+    }
+  })
   const diagramTop = 84
   const leftCardWidth = 246
   const leftCardHeight = 148
-  const stepCardWidth = 138
-  const stepCardHeight = 94
-  const groupWidth = 260
-  const groupHeight = showExtendedDetail ? 122 : 110
+  const stepCardWidth = 158
+  const stepCardHeight = 130
+  const groupWidth = 248
+  const groupHeight = Math.min(
+    showExtendedDetail ? 156 : 140,
+    Math.max(showExtendedDetail ? 122 : 110, ...groupTextProfiles.map((profile) => profile.requiredHeight)),
+  )
   const groupGap = 20
   const analysisWidth = 252
   const analysisHeight = 150
@@ -4904,15 +6269,20 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
   const leftCardY = diagramTop + (diagramHeight - leftCardHeight) / 2
   const stepCardX = 336
   const stepCardY = diagramTop + (diagramHeight - stepCardHeight) / 2
-  const groupX = 520
+  const groupX = 532
   const groupStartY = diagramTop + (diagramHeight - groupStackHeight) / 2
   const analysisX = 886
   const analysisY = diagramTop + (diagramHeight - analysisHeight) / 2
-  const bottomTop = diagramTop + diagramHeight + 48
-  const panelHeight = showExtendedDetail ? 148 : 126
-  const panelWidth = 348
+  const timelineTop = diagramTop + diagramHeight + 24
+  const bottomTop = diagramTop + diagramHeight + (hasTimelineBand ? 112 : 48)
+  const panelLineLimit = detailLevel === "detailed" ? 7 : detailLevel === "standard" ? 5 : 4
+  const panelHeight = detailLevel === "detailed" ? 172 : showExtendedDetail ? 150 : 126
+  const panelColumns = panelContentBlocks.length === 0 ? 1 : panelContentBlocks.length <= 2 ? 2 : 3
   const panelGap = 18
-  const height = bottomTop + panelHeight + 42
+  const panelWidth = (1096 - (panelColumns - 1) * panelGap) / panelColumns
+  const panelRows = panelContentBlocks.length ? Math.ceil(panelContentBlocks.length / panelColumns) : 0
+  const panelStackHeight = panelRows ? panelRows * panelHeight + Math.max(0, panelRows - 1) * panelGap : 0
+  const height = bottomTop + panelStackHeight + 42
 
   const step1Title = disease
   const step1Details = uniqueItemsCaseInsensitive([
@@ -4923,48 +6293,98 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
 
   const step2Title =
     schemaType === "interventional"
-      ? study.subcategory || "Randomized comparison"
+      ? flowDesignLabel || "Randomized comparison"
       : schemaType === "rwe_secondary_database"
-        ? study.designOverview || "Cohort definition and confounding control"
+        ? flowDesignLabel || "Cohort definition and confounding control"
         : schemaType === "evidence_synthesis"
-          ? study.designOverview || "Structured search and selection logic"
-          : study.designOverview || study.subcategory || "Methodology"
+          ? flowDesignLabel || "Structured search and selection logic"
+          : flowDesignLabel || "Methodology"
   const step2Details = uniqueItemsCaseInsensitive([
-    study.timeline || "",
     comparator ? `Against ${comparator}` : "",
+    study.geography ? `Region: ${study.geography}` : "",
   ]).slice(0, 2)
+  const step2TitleLines = wrapSvgText(step2Title, 20).slice(0, 3)
+  const step2DetailLines = step2TitleLines.length >= 3 ? [] : step2Details.flatMap((item) => wrapSvgText(item, 22)).slice(0, 1)
+  const step2DetailsY = stepCardY + 50 + step2TitleLines.length * 18 + 8
 
-  const detailPanels = [
-    {
-      title: "Primary objective",
-      lines: wrapSvgText(primaryObjective, 46),
+  const secondaryObjectiveLines = splitStructuredEditorItems(study.secondaryObjectives || "")
+  const endpointLines = splitItems(getResolvedOutcomes(study))
+  const eligibilityLines = splitStructuredEditorItems(study.eligibility || "")
+  const designLines = splitStructuredEditorItems(study.designOverview || "")
+  const panelDefinitions: Record<
+    StudySchemaContentBlock,
+    { title: string; lines: string[]; accent: string; border: string }
+  > = {
+    objectives: {
+      title: "Objectives",
+      lines: uniqueItemsCaseInsensitive([
+        primaryObjective,
+        ...(showExtendedDetail ? secondaryObjectiveLines.slice(0, 2) : []),
+      ]).flatMap((item) => wrapSvgText(item, 48)),
       accent: schema.theme.accent,
-      fill: "#FFFFFF",
       border: hexToRgba(schema.theme.accent, 0.24),
     },
-    {
-      title: config.analysisLabel,
-      lines: wrapSvgText(primaryEndpoint, 46).concat(
-        showExtendedDetail && splitStructuredEditorItems(study.secondaryObjectives || "")[0]
-          ? wrapSvgText(splitStructuredEditorItems(study.secondaryObjectives || "")[0], 46)
-          : [],
-      ),
+    endpoints: {
+      title: "Endpoints",
+      lines: uniqueItemsCaseInsensitive([
+        primaryEndpoint,
+        ...(showExtendedDetail ? endpointLines.slice(1, 4) : []),
+      ]).flatMap((item) => wrapSvgText(item, 48)),
       accent: schema.theme.edge,
-      fill: "#FFFFFF",
+      border: hexToRgba(schema.theme.edge, 0.22),
+    },
+    population: {
+      title: "Population",
+      lines: wrapSvgText(study.population || disease || "Population to be confirmed", 48),
+      accent: schema.theme.accent,
+      border: hexToRgba(schema.theme.accent, 0.2),
+    },
+    eligibility: {
+      title: "Eligibility",
+      lines: (eligibilityLines.length ? eligibilityLines : [study.eligibility || "Eligibility criteria to be confirmed"])
+        .slice(0, showExtendedDetail ? 4 : 2)
+        .flatMap((item) => wrapSvgText(item, 48)),
+      accent: schema.theme.edge,
       border: hexToRgba(schema.theme.edge, 0.2),
     },
-    {
+    timeline: {
+      title: "Timeline",
+      lines: uniqueItemsCaseInsensitive([
+        study.timeline || "Timeline to be confirmed",
+        study.sampleSize ? `Sample size: ${study.sampleSize}` : "",
+        study.geography ? `Geography: ${study.geography}` : "",
+      ]).flatMap((item) => wrapSvgText(item, 48)),
+      accent: schema.theme.text,
+      border: "rgba(148, 163, 184, 0.35)",
+    },
+    comparator: {
+      title: "Comparator",
+      lines: wrapSvgText(comparator || "Comparator, external control, or benchmark to be confirmed", 48),
+      accent: schema.theme.edge,
+      border: hexToRgba(schema.theme.edge, 0.2),
+    },
+    decision_use: {
       title: "Decision use",
       lines: uniqueItemsCaseInsensitive([
         evidenceIntent,
         strategicObjective ? `Program intent: ${strategicObjective}` : "",
-        study.timeline || "",
-      ]).flatMap((item) => wrapSvgText(item, 44)).slice(0, showExtendedDetail ? 5 : 4),
+      ]).flatMap((item) => wrapSvgText(item, 48)),
       accent: schema.theme.text,
-      fill: "#FFFFFF",
       border: "rgba(148, 163, 184, 0.35)",
     },
-  ]
+    design: {
+      title: "Design",
+      lines: (designLines.length ? designLines : [designSummary || "Design to be confirmed"])
+        .slice(0, showExtendedDetail ? 3 : 1)
+        .flatMap((item) => wrapSvgText(item, 48)),
+      accent: schema.theme.accent,
+      border: hexToRgba(schema.theme.accent, 0.2),
+    },
+  }
+  const detailPanels = panelContentBlocks.map((block) => ({
+    ...panelDefinitions[block],
+    fill: "#FFFFFF",
+  }))
 
   const connectionColor = hexToRgba(schema.theme.edge, 0.72)
   const groupJoinX = analysisX - 34
@@ -5002,31 +6422,75 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
   const groupMarkup = groups
     .map((group, index) => {
       const groupY = groupStartY + index * (groupHeight + groupGap)
-      const headerFill = hexToRgba(group.color, 0.14)
-      const borderColor = hexToRgba(group.color, 0.48)
-      const titleLines = wrapSvgText(group.title, 28).slice(0, 2)
-      const bodyLines = wrapSvgText(group.body, 34).slice(0, showExtendedDetail ? 3 : 2)
+      const isTreatment = group.tone === "treatment"
+      const isComparator = group.tone === "comparator"
+      const cardFill = isTreatment ? schema.theme.accent : isComparator ? "#F4F4F5" : schema.theme.nodeFill
+      const headerFill = isTreatment ? hexToRgba("#FFFFFF", 0.14) : isComparator ? "#E5E7EB" : hexToRgba(group.color, 0.14)
+      const borderColor = isTreatment ? hexToRgba(schema.theme.accent, 0.74) : isComparator ? "#D4D4D8" : hexToRgba(group.color, 0.48)
+      const textFill = isTreatment ? "#FFFFFF" : schema.theme.text
+      const headerTextFill = isTreatment ? "#FFFFFF" : isComparator ? "#52525B" : group.color
+      const { titleLines, bodyLines } = groupTextProfiles[index]
 
       return `
         <g>
-          <rect x="${groupX}" y="${groupY}" width="${groupWidth}" height="${groupHeight}" rx="24" fill="${schema.theme.nodeFill}" stroke="${borderColor}" stroke-width="2" />
+          <rect x="${groupX}" y="${groupY}" width="${groupWidth}" height="${groupHeight}" rx="24" fill="${cardFill}" stroke="${borderColor}" stroke-width="2" />
           <rect x="${groupX}" y="${groupY}" width="${groupWidth}" height="40" rx="24" fill="${headerFill}" />
-          <text x="${groupX + 18}" y="${groupY + 25}" font-size="11" font-weight="700" letter-spacing="1.1" fill="${group.color}">${escapeHtml(group.header.toUpperCase())}</text>
-          ${renderTextLines(titleLines, groupX + 18, groupY + 62, 18, 20, schema.theme.text, 700)}
-          ${renderTextLines(bodyLines, groupX + 18, groupY + 92, 12, 16, schema.theme.text, 500, 0.82)}
+          <text x="${groupX + 18}" y="${groupY + 25}" font-size="11" font-weight="700" letter-spacing="1.1" fill="${headerTextFill}" opacity="${isTreatment ? "0.86" : "1"}">${escapeHtml(group.header.toUpperCase())}</text>
+          ${renderTextLines(titleLines, groupX + 18, groupY + 62, 18, 20, textFill, 700)}
+          ${renderTextLines(bodyLines, groupX + 18, groupY + 92, 12, 16, textFill, 500, isTreatment ? 0.88 : 0.82)}
         </g>
       `
     })
     .join("")
 
+  const timelineText = study.timeline?.trim() || ""
+  const extractTimelinePart = (keywords: string[]) => {
+    const escapedKeywords = keywords.map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
+    const durationBeforeKeyword = new RegExp(
+      `(?:~|approx(?:imately)?\\.?\\s*)?\\d+\\s*[- ]?\\s*(?:day|week|month|year)s?\\s+(?:of\\s+)?(?:${escapedKeywords})[^,;.]*`,
+      "i",
+    )
+    const keywordBeforeDuration = new RegExp(
+      `(?:${escapedKeywords})[^,;.]*?(?:~|approx(?:imately)?\\.?\\s*)?\\d+\\s*[- ]?\\s*(?:day|week|month|year)s?`,
+      "i",
+    )
+    return timelineText.match(durationBeforeKeyword)?.[0] || timelineText.match(keywordBeforeDuration)?.[0] || ""
+  }
+  const enrollmentDetail =
+    extractTimelinePart(["enrollment", "enrolment", "screening", "recruitment"]) || "Enrollment / index period"
+  const followUpDetail = extractTimelinePart(["follow-up", "follow up", "survival follow-up", "readout"]) || "Follow-up / readout period"
+  const timelineArrow = (x: number, y: number, arrowWidth: number, fill: string, label: string, detail: string) => {
+    const arrowHead = 24
+    const arrowHeight = 48
+    return `
+      <g>
+        <path d="M ${x} ${y} H ${x + arrowWidth - arrowHead} L ${x + arrowWidth} ${y + arrowHeight / 2} L ${x + arrowWidth - arrowHead} ${y + arrowHeight} H ${x} Z" fill="${fill}" />
+        <text x="${x + 18}" y="${y + 19}" font-size="10" font-weight="800" letter-spacing="1.1" fill="#FFFFFF" opacity="0.82">${escapeHtml(label.toUpperCase())}</text>
+        ${renderTextLines(wrapSvgText(detail, 62).slice(0, 1), x + 18, y + 38, 13, 15, "#FFFFFF", 700, 0.95)}
+      </g>
+    `
+  }
+  const timelineMarkup = hasTimelineBand
+    ? `
+      <g>
+        <text x="42" y="${timelineTop}" font-size="10" font-weight="800" letter-spacing="1.2" fill="${schema.theme.text}" opacity="0.62">STUDY TIMELINE</text>
+        ${timelineArrow(42, timelineTop + 12, 540, schema.theme.accent, "Enrollment", enrollmentDetail)}
+        ${timelineArrow(596, timelineTop + 12, 542, comparatorColor, "Follow-up / readout", followUpDetail)}
+      </g>
+    `
+    : ""
+
   const panelMarkup = detailPanels
     .map((panel, index) => {
-      const panelX = 42 + index * (panelWidth + panelGap)
+      const panelColumn = index % panelColumns
+      const panelRow = Math.floor(index / panelColumns)
+      const panelX = 42 + panelColumn * (panelWidth + panelGap)
+      const panelY = bottomTop + panelRow * (panelHeight + panelGap)
       return `
         <g>
-          <rect x="${panelX}" y="${bottomTop}" width="${panelWidth}" height="${panelHeight}" rx="24" fill="${panel.fill}" stroke="${panel.border}" stroke-width="1.8" />
-          <text x="${panelX + 18}" y="${bottomTop + 26}" font-size="11" font-weight="700" letter-spacing="1.2" fill="${panel.accent}">${escapeHtml(panel.title.toUpperCase())}</text>
-          ${renderTextLines(panel.lines.slice(0, showExtendedDetail ? 5 : 4), panelX + 18, bottomTop + 56, 13, 18, schema.theme.text, 600, 0.92)}
+          <rect x="${panelX}" y="${panelY}" width="${panelWidth}" height="${panelHeight}" rx="24" fill="${panel.fill}" stroke="${panel.border}" stroke-width="1.8" />
+          <text x="${panelX + 18}" y="${panelY + 26}" font-size="11" font-weight="700" letter-spacing="1.2" fill="${panel.accent}">${escapeHtml(panel.title.toUpperCase())}</text>
+          ${renderTextLines(panel.lines.slice(0, panelLineLimit), panelX + 18, panelY + 56, 13, 18, schema.theme.text, 600, 0.92)}
         </g>
       `
     })
@@ -5063,8 +6527,8 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
       <g>
         <rect x="${stepCardX}" y="${stepCardY}" width="${stepCardWidth}" height="${stepCardHeight}" rx="28" fill="${schema.theme.laneFill}" stroke="${hexToRgba(schema.theme.accent, 0.42)}" stroke-width="2.4" />
         <text x="${stepCardX + 18}" y="${stepCardY + 24}" font-size="11" font-weight="700" letter-spacing="1.1" fill="${schema.theme.accent}">STEP 2</text>
-        ${renderTextLines(wrapSvgText(step2Title, 17).slice(0, 2), stepCardX + 18, stepCardY + 50, 15, 18, schema.theme.text, 700)}
-        ${renderTextLines(step2Details.flatMap((item) => wrapSvgText(item, 18)).slice(0, 2), stepCardX + 18, stepCardY + 76, 11, 14, schema.theme.text, 500, 0.75)}
+        ${renderTextLines(step2TitleLines, stepCardX + 18, stepCardY + 50, 15, 18, schema.theme.text, 700)}
+        ${renderTextLines(step2DetailLines, stepCardX + 18, step2DetailsY, 11, 14, schema.theme.text, 500, 0.75)}
       </g>
 
       ${lineMarkup.join("")}
@@ -5077,7 +6541,6 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
         ${renderTextLines(
           uniqueItemsCaseInsensitive([
             evidenceIntent,
-            study.timeline ? `Timeline: ${study.timeline}` : "",
           ])
             .flatMap((item) => wrapSvgText(item, 30))
             .slice(0, 3),
@@ -5091,9 +6554,142 @@ function buildStudySchemaSvgMarkup(schema: StudySchemaForm, study?: StudyForm) {
         )}
       </g>
 
+      ${timelineMarkup}
       ${panelMarkup}
     </svg>
   `
+}
+
+function toPptColor(hex: string, fallback = "FFFFFF") {
+  const normalized = hex.replace("#", "").trim()
+
+  return /^[0-9a-f]{6}$/i.test(normalized) ? normalized.toUpperCase() : fallback
+}
+
+function buildStudySchemaPptxPayload(schema: StudySchemaForm, study: StudyForm, fileName: string) {
+  const schemaType = schema.schemaType || inferStudySchemaType(study)
+  const designPattern = getResolvedStudySchemaDesignPattern(study, schema)
+  const selectedContentBlocks = schema.contentBlocks?.length
+    ? schema.contentBlocks
+    : STUDY_SCHEMA_USE_CASE_PRESETS[schema.useCase || "executive_slide"]
+  const disease = getSelectedDiseaseLabel(study) || getResolvedIndication(study) || "Target condition"
+  const intervention = study.topIntervention || study.intervention || "Study intervention"
+  const comparator = study.topComparator || study.comparator || ""
+  const primaryObjective = study.primaryObjective || "Primary objective to be confirmed"
+  const primaryEndpoint = splitItems(getResolvedOutcomes(study))[0] || "Primary endpoint to be confirmed"
+  const evidenceIntent = getPrimaryEvidenceUseIntent(study) || "Decision use to be confirmed"
+  const strategicObjective = getStrategicObjectiveLabel(study) || "Program intent to be confirmed"
+  const designSummary = buildStudySchemaDesignSummary(study, schemaType)
+  const flowDesignLabel = buildStudySchemaFlowDesignLabel(study, schemaType)
+  const secondaryObjectiveLines = splitStructuredEditorItems(study.secondaryObjectives || "")
+  const endpointLines = splitItems(getResolvedOutcomes(study))
+  const eligibilityLines = splitStructuredEditorItems(study.eligibility || "")
+  const designLines = splitStructuredEditorItems(study.designOverview || "")
+  const studySetupDetails = uniqueItemsCaseInsensitive([
+    compactSchemaText(study.population || getResolvedIndication(study), disease, 88),
+    study.sampleSize ? `Planned size: ${study.sampleSize}` : "",
+    study.developmentStage || "",
+  ])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("\n")
+  const step2Details = uniqueItemsCaseInsensitive([
+    comparator ? `Against ${comparator}` : "",
+    study.geography ? `Region: ${study.geography}` : "",
+  ])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("\n")
+  const bannerText = schema.notes[0] || designSummary
+
+  const panelBlocks = selectedContentBlocks.filter((block) => block !== "timeline")
+  const panelDefinitions: Record<StudySchemaContentBlock, { title: string; body: string; border: string }> = {
+    objectives: {
+      title: "Objectives",
+      body: uniqueItemsCaseInsensitive([primaryObjective, ...secondaryObjectiveLines.slice(0, 2)]).join("\n"),
+      border: "F2B8BC",
+    },
+    endpoints: {
+      title: "Endpoints",
+      body: uniqueItemsCaseInsensitive([primaryEndpoint, ...endpointLines.slice(1, 3)]).join("\n"),
+      border: "D6B0BB",
+    },
+    population: { title: "Population", body: study.population || disease, border: "F2B8BC" },
+    eligibility: {
+      title: "Eligibility",
+      body: (eligibilityLines.length ? eligibilityLines : [study.eligibility || "Eligibility to be confirmed"]).slice(0, 3).join("\n"),
+      border: "D6B0BB",
+    },
+    timeline: {
+      title: "Timeline",
+      body: uniqueItemsCaseInsensitive([study.timeline, study.sampleSize ? `Sample size: ${study.sampleSize}` : "", study.geography]).join("\n"),
+      border: "CBD5E1",
+    },
+    comparator: { title: "Comparator", body: comparator || "Comparator to be confirmed", border: "D6B0BB" },
+    decision_use: {
+      title: "Decision use",
+      body: uniqueItemsCaseInsensitive([evidenceIntent, `Program intent: ${strategicObjective}`]).join("\n"),
+      border: "CBD5E1",
+    },
+    design: {
+      title: "Design",
+      body: (designLines.length ? designLines : [designSummary]).slice(0, 3).join("\n"),
+      border: "F2B8BC",
+    },
+  }
+
+  return {
+    fileName,
+    title: schema.title || "Study schema",
+    schemaType,
+    designPattern,
+    hasTimeline: selectedContentBlocks.includes("timeline"),
+    colors: {
+      accent: toPptColor(schema.theme.accent, "D71920"),
+      edge: toPptColor(schema.theme.edge, "8A1538"),
+      text: toPptColor(schema.theme.text, "242424"),
+      background: toPptColor(schema.theme.background, "FFF7F7"),
+      softFill: toPptColor(schema.theme.laneFill, "FDECEC"),
+      cardFill: toPptColor(schema.theme.nodeFill, "FFFFFF"),
+    },
+    banner: compactSchemaText(bannerText, designSummary, 132),
+    disease,
+    studySetupDetails,
+    designSummary: flowDesignLabel,
+    step2Details,
+    intervention,
+    interventionSubtitle: study.topLineOfTherapy || disease,
+    comparator,
+    primaryEndpoint,
+    evidenceIntent,
+    timeline: study.timeline || "Timeline to be confirmed",
+    panels: panelBlocks.slice(0, 6).map((block) => ({
+      ...panelDefinitions[block],
+      body: compactSchemaLines(panelDefinitions[block].body, 3, 92),
+    })),
+  }
+}
+
+async function exportStudySchemaToEditablePptx(schema: StudySchemaForm, study: StudyForm, fileName: string) {
+  const response = await fetch(apiUrl("/api/study-schema-pptx"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildStudySchemaPptxPayload(schema, study, fileName)),
+  })
+
+  if (!response.ok) {
+    throw new Error((await response.text()) || "Unable to generate the PPTX file.")
+  }
+
+  const blob = await response.blob()
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
 }
 
 function inferEndpointType(outcomes: string) {
@@ -5153,6 +6749,7 @@ function buildPicoFromStudy(study: StudyForm): PicoForm {
     "Extract publication-ready PICO elements from the following study design details.",
     `Study title: ${normalizedStudy.studyTitle || "Untitled study"}`,
     `Development stage: ${normalizedStudy.developmentStage || "Not selected"}`,
+    buildProtocolGuardrailInstruction(normalizedStudy),
     `Strategic objective: ${getStrategicObjectiveLabel(normalizedStudy) || "Not selected"}`,
     `Primary evidence use intent: ${evidenceIntent || "Not selected"}`,
     `Secondary evidence use intents: ${normalizedStudy.secondaryEvidenceUseIntents.join(", ") || "None selected"}`,
@@ -5182,6 +6779,7 @@ function buildPicoFromStudy(study: StudyForm): PicoForm {
     outcomes: endpointText || normalizedStudy.primaryObjective || "Primary and secondary outcomes to be confirmed",
     timeframe: normalizedStudy.timeline || "Assessment period to be confirmed",
     prompt,
+    sourceFingerprint: buildStudySchemaFingerprint(normalizedStudy),
   }
 }
 
@@ -5261,6 +6859,7 @@ function buildStatsFromStudy(study: StudyForm, pico: PicoForm): StatsForm {
         : "Use prespecified imputation or model-based handling with sensitivity analyses for missing-not-at-random risk",
     rationale,
     prompt,
+    sourceFingerprint: buildStudySchemaFingerprint(study),
   }
 }
 
@@ -5326,6 +6925,7 @@ function buildLiteratureFromState(study: StudyForm, pico: PicoForm): LiteratureF
       "Screen ClinicalTrials.gov, regulatory documents, major congress abstracts, and reference lists from pivotal reviews and guidelines.",
     backgroundThemes: themes.join("\n"),
     prompt,
+    sourceFingerprint: buildStudySchemaFingerprint(study),
   }
 }
 
@@ -5349,6 +6949,7 @@ function buildSchedulePromptFromState(
     `Primary objective: ${study.primaryObjective || "Not provided"}`,
     `Intervention: ${study.topIntervention || pico.intervention || study.intervention || "Not provided"}`,
     `Comparator: ${study.topComparator || pico.comparator || study.comparator || "Not provided"}`,
+    buildScheduleStructureInstruction(study, schedule),
     `Endpoints: ${pico.outcomes || getResolvedOutcomes(study) || "Not provided"}`,
     `Statistical context: ${stats.endpointType || "Not provided"} endpoint using ${stats.analysisModel || "analysis model pending"}`,
     `Operational notes: ${study.operationalNotes || study.timeline || "Not provided"}`,
@@ -5635,15 +7236,11 @@ function buildScheduleFromState(
   ]
 
   return normalizeSchedule({
-    purpose:
-      schedule?.purpose ||
-      [
-        `Schedule of Activities for ${study.studyTitle || "the planned interventional study"}.`,
-        'Rows represent assessments and procedural activities. Columns represent visits grouped by phase and period. "X" indicates required activity; blank indicates not required.',
-      ].join(" "),
+    purpose: schedule?.purpose || "Schedule of Activities",
     prompt: schedule?.prompt || DEFAULT_SCHEDULE_PROMPT,
     iterationPrompt: schedule?.iterationPrompt || "",
     tableLayout: schedule?.tableLayout || "auto",
+    structureMode: schedule?.structureMode || "auto",
     columns,
     rows: rowDefinitions.map((row, index) => ({
       id: `${slugify(row.group)}-${slugify(row.activity)}-${index + 1}`,
@@ -5655,6 +7252,7 @@ function buildScheduleFromState(
     generatedAt: new Date().toISOString(),
     provenance: "local_draft",
     manualEdited: false,
+    sourceFingerprint: buildStudySchemaFingerprint(study),
   })
 }
 
@@ -5672,6 +7270,7 @@ function buildScheduleInsightsFromState(
   stats: StatsForm,
   schedule: ScheduleForm,
   focus?: string,
+  mode: ScheduleInsightMode = "complexity",
 ): ScheduleInsights {
   const columns = schedule.columns
   const rows = schedule.rows
@@ -5855,6 +7454,7 @@ function buildScheduleInsightsFromState(
 
   return normalizeScheduleInsights({
     focus: focus || buildScheduleAnalysisFocus(study, schedule),
+    mode,
     generatedAt: new Date().toISOString(),
     provenance: "local_draft",
     complexity: {
@@ -5881,12 +7481,65 @@ function buildScheduleInsightsFromState(
 
 function validateSchedule(schedule: ScheduleForm) {
   const missing = []
+  const hasScheduledActivity = schedule.rows.some((row) =>
+    schedule.columns.some((column) => hasScheduleCellValue(row.cells[column.id] || "")),
+  )
 
   if (!schedule.columns.length) missing.push("Schedule visit columns")
   if (!schedule.rows.length) missing.push("Schedule activity rows")
   if (schedule.rows.length && !schedule.rows.some((row) => row.activity.trim())) missing.push("Named schedule activities")
+  if (schedule.columns.length && schedule.rows.length && !hasScheduledActivity) {
+    missing.push("At least one scheduled activity marker")
+  }
 
   return missing
+}
+
+function isBoilerplateSchedulePurpose(purpose: string) {
+  const normalized = purpose.trim().toLowerCase()
+
+  return (
+    normalized.startsWith("schedule of activities for ") ||
+    normalized.includes("rows represent assessments and procedural activities") ||
+    normalized.includes('"x" indicates required activity')
+  )
+}
+
+function isScheduleEligibleStudy(study: StudyForm) {
+  const category = (study.category || "").toLowerCase()
+  const subcategory = (study.subcategory || "").toLowerCase()
+
+  return category === "interventional" || (category === "non-interventional" && subcategory.includes("primary"))
+}
+
+function getScheduleEligibilityLabel(study: StudyForm) {
+  if ((study.category || "").toLowerCase() === "interventional") {
+    return "Interventional studies often use SoA to align visits, assessments, safety capture, and endpoint-critical timing."
+  }
+
+  if (isScheduleEligibleStudy(study)) {
+    return "Prospective non-interventional studies can use a lighter SoA for planned contacts, data collection windows, PROs, and follow-up."
+  }
+
+  return "SoA is usually not needed for this study type unless there are planned visits or prospective data-collection contacts."
+}
+
+function buildSkippedLiteraturePlan(study: StudyForm, pico: PicoForm): LiteratureForm {
+  return {
+    ...initialLiteratureForm,
+    researchQuestion: pico.outcomes
+      ? `Literature search skipped. Background should rely on study inputs and user-provided rationale for ${pico.outcomes}.`
+      : "Literature search skipped. Background should rely on study inputs and user-provided rationale.",
+    databases: "Not used",
+    evidenceWindow: "Not used",
+    inclusionCriteria: "Not used",
+    exclusionCriteria: "Not used",
+    greyLiteraturePlan: "Not used",
+    backgroundThemes: `Literature search was not enabled for this synopsis. Do not imply that background statements were derived from a systematic or targeted literature search. ${
+      study.designOverview || ""
+    }`.trim(),
+    prompt: "Literature module skipped by user.",
+  }
 }
 
 function generateSectionBody(
@@ -6061,7 +7714,11 @@ function scheduleToHtml(schedule: ScheduleForm) {
 
   return `
     <div class="soa-block">
-      <p class="soa-purpose">${escapeHtml(schedule.purpose || "Schedule of Activities")}</p>
+      ${
+        schedule.purpose && !isBoilerplateSchedulePurpose(schedule.purpose)
+          ? `<p class="soa-purpose">${escapeHtml(schedule.purpose)}</p>`
+          : ""
+      }
       ${presentation.tables
         .map(
           (table, index) => `
@@ -6086,6 +7743,29 @@ function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "study-synopsis"
 }
 
+function InfoTooltip({
+  content,
+  label = "More information",
+}: {
+  content: ReactNode
+  label?: string
+}) {
+  return (
+    <span className="group relative inline-flex">
+      <span
+        className="inline-flex h-7 w-7 cursor-help items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-[#74C0FC] hover:bg-[#E7F5FF] hover:text-[#1864AB]"
+        aria-label={label}
+        tabIndex={0}
+      >
+        <Info className="h-3.5 w-3.5" />
+      </span>
+      <span className="pointer-events-none absolute right-0 top-9 z-40 hidden w-80 rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs leading-5 text-slate-600 shadow-[0_18px_50px_rgba(15,23,42,0.16)] group-hover:block group-focus-within:block">
+        {content}
+      </span>
+    </span>
+  )
+}
+
 function Field({
   label,
   value,
@@ -6108,10 +7788,12 @@ function Field({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm font-medium text-slate-700">{label}</span>
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+          {label}
+          {description ? <InfoTooltip content={description} label={`${label} guidance`} /> : null}
+        </span>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
-      {description ? <p className="text-xs leading-6 text-slate-500">{description}</p> : null}
       <input
         value={safeValue}
         onChange={(event) => onChange(event.target.value)}
@@ -6158,25 +7840,26 @@ function TextAreaField({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm font-medium text-slate-700">{label}</span>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-      </div>
-      {description ? <p className="text-xs leading-6 text-slate-500">{description}</p> : null}
-      {collapsibleInput ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Raw text editor</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              Use this only when you want to paste or edit the full field as plain text. Structured items remain the primary view.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowInput((current) => !current)}
-            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800"
-          >
-            {showInput ? "Hide text editor" : collapsibleInputLabel}
-          </button>
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+          {label}
+          {description ? <InfoTooltip content={description} label={`${label} guidance`} /> : null}
+        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {collapsibleInput ? (
+            <button
+              onClick={() => setShowInput((current) => !current)}
+              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800"
+            >
+              {showInput ? "Done editing text" : collapsibleInputLabel}
+            </button>
+          ) : null}
+          {actions}
         </div>
+      </div>
+      {collapsibleInput && showInput ? (
+        <p className="text-xs leading-5 text-slate-500">
+          Editing the full text field. Use the structured items below for selective review and trimming.
+        </p>
       ) : null}
       {(!collapsibleInput || showInput) && (
         <textarea
@@ -6204,6 +7887,7 @@ function StructuredItemEditor({
   onItemChange,
   onDelete,
   addPlaceholder,
+  previewCount = 4,
 }: {
   title: string
   description: string
@@ -6216,19 +7900,62 @@ function StructuredItemEditor({
   onItemChange: (id: string, value: string) => void
   onDelete: (id: string) => void
   addPlaceholder: string
+  previewCount?: number
 }) {
+  const [expanded, setExpanded] = useState(false)
+  const activeItems = items.filter((item) => item.active)
+  const previewItems = activeItems.slice(0, previewCount)
+  const hiddenPreviewCount = Math.max(activeItems.length - previewItems.length, 0)
+
+  const formatPreviewText = (value: string) =>
+    value
+      .replace(/^[\s•\-–]+/, "")
+      .replace(/\s+/g, " ")
+      .trim()
+
   return (
     <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{title}</p>
-          <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+          <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            {title}
+            <InfoTooltip content={description} label={`${title} guidance`} />
+          </p>
         </div>
         <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-          {items.filter((item) => item.active).length} active
+          {activeItems.length} active
         </span>
       </div>
-      {items.length > 0 ? (
+
+      {activeItems.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {previewItems.map((item) => (
+            <span
+              key={item.id}
+              className="max-w-full truncate rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm sm:max-w-[22rem]"
+              title={item.text}
+            >
+              {formatPreviewText(item.text)}
+            </span>
+          ))}
+          {hiddenPreviewCount > 0 ? (
+            <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
+              +{hiddenPreviewCount} more
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm leading-6 text-slate-500">{emptyText}</p>
+      )}
+
+      <button
+        onClick={() => setExpanded((current) => !current)}
+        className="mt-3 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800"
+      >
+        {expanded ? "Hide details" : items.length ? "Manage items" : "Add items"}
+      </button>
+
+      {expanded ? (
         <div className="mt-3 space-y-2">
           {items.map((item) => (
             <div
@@ -6259,43 +7986,44 @@ function StructuredItemEditor({
               </button>
             </div>
           ))}
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={draftValue}
+              onChange={(event) => onDraftChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault()
+                  onAdd()
+                }
+              }}
+              placeholder={addPlaceholder}
+              className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+            />
+            <button
+              onClick={onAdd}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800"
+            >
+              <Plus className="h-4 w-4" />
+              Add item
+            </button>
+          </div>
         </div>
-      ) : (
-        <p className="mt-3 text-sm leading-6 text-slate-500">{emptyText}</p>
-      )}
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <input
-          value={draftValue}
-          onChange={(event) => onDraftChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault()
-              onAdd()
-            }
-          }}
-          placeholder={addPlaceholder}
-          className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-        />
-        <button
-          onClick={onAdd}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800"
-        >
-          <Plus className="h-4 w-4" />
-          Add item
-        </button>
-      </div>
+      ) : null}
     </div>
   )
 }
 
 function OverlayModal({
   open,
+  eyebrow = "AI proposal",
   title,
   description,
   onClose,
   children,
 }: {
   open: boolean
+  eyebrow?: string
   title: string
   description?: string
   onClose: () => void
@@ -6313,7 +8041,7 @@ function OverlayModal({
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1864AB]">AI proposal</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1864AB]">{eyebrow}</p>
             <h3 className="mt-2 text-2xl font-semibold text-slate-950">{title}</h3>
             {description ? <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">{description}</p> : null}
           </div>
@@ -6478,24 +8206,29 @@ function SectionAudit({ section }: { section: SynopsisSection }) {
 
 function TabHelpButton({
   tabId,
-  open,
-  onToggle,
+  open: _open,
+  onToggle: _onToggle,
 }: {
   tabId: TabId
   open: boolean
   onToggle: (tabId: TabId) => void
 }) {
+  const help = TAB_HELP_CONTENT[tabId]
+
   return (
-    <button
-      onClick={() => onToggle(tabId)}
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition ${
-        open ? "border-[#74C0FC] bg-[#E7F5FF] text-[#1864AB]" : "border-slate-200 bg-white text-slate-500 hover:bg-[#E7F5FF] hover:text-[#1864AB]"
-      }`}
-      aria-label="Open tab guidance"
-      title="Open tab guidance"
-    >
-      <Info className="h-4 w-4" />
-    </button>
+    <InfoTooltip
+      label={`${help.title} guidance`}
+      content={
+        <div>
+          <p className="font-semibold text-slate-900">{help.title}</p>
+          <ul className="mt-2 space-y-1">
+            {help.items.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      }
+    />
   )
 }
 
@@ -6614,21 +8347,27 @@ function ScheduleTable({
   const phaseGroups = getPhaseGroups(schedule.columns)
   const periodGroups = getPeriodGroups(schedule.columns)
   const rowGroups = getScheduleRowGroups(schedule.rows)
+  const stickySectionWidth = editable ? 165 : 180
+  const stickyActivityWidth = editable ? 250 : 260
+  const visitColumnWidth = editable ? 92 : 104
+  const notesColumnWidth = editable ? 210 : 220
 
   return (
-    <div className="overflow-x-auto rounded-[24px] border border-slate-200 bg-white">
-      <table className="min-w-max border-collapse text-sm">
+    <div className="w-full overflow-x-auto rounded-[24px] border border-slate-200 bg-white">
+      <table className={`min-w-full table-fixed border-collapse ${editable ? "text-xs" : "text-sm"}`}>
         <thead className="bg-slate-50 text-slate-900">
           <tr>
             <th
               rowSpan={3}
-              className="sticky left-0 z-30 min-w-[180px] border border-slate-200 bg-slate-50 px-3 py-3 text-left font-semibold shadow-[2px_0_0_rgba(226,232,240,0.95)]"
+              style={{ left: 0, minWidth: stickySectionWidth, width: stickySectionWidth }}
+              className="sticky z-30 border border-slate-200 bg-slate-50 px-3 py-3 text-left font-semibold shadow-[2px_0_0_rgba(226,232,240,0.95)]"
             >
               Section
             </th>
             <th
               rowSpan={3}
-              className="sticky left-[180px] z-30 min-w-[260px] border border-slate-200 bg-slate-50 px-3 py-3 text-left font-semibold shadow-[2px_0_0_rgba(226,232,240,0.95)]"
+              style={{ left: stickySectionWidth, minWidth: stickyActivityWidth, width: stickyActivityWidth }}
+              className="sticky z-30 border border-slate-200 bg-slate-50 px-3 py-3 text-left font-semibold shadow-[2px_0_0_rgba(226,232,240,0.95)]"
             >
               Activity
             </th>
@@ -6647,14 +8386,18 @@ function ScheduleTable({
                         event.target.value,
                       )
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-semibold text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                    className="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-xs font-semibold text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                   />
                 ) : (
                   group.label
                 )}
               </th>
             ))}
-            <th rowSpan={3} className="min-w-[220px] border border-slate-200 bg-slate-50 px-3 py-3 text-left font-semibold">
+            <th
+              rowSpan={3}
+              style={{ minWidth: notesColumnWidth, width: notesColumnWidth }}
+              className="border border-slate-200 bg-slate-50 px-3 py-3 text-left font-semibold"
+            >
               Notes
             </th>
             {editable && (
@@ -6679,7 +8422,7 @@ function ScheduleTable({
                         event.target.value,
                       )
                     }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                    className="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-[11px] font-semibold text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                   />
                 ) : (
                   group.label
@@ -6689,27 +8432,33 @@ function ScheduleTable({
           </tr>
           <tr>
             {schedule.columns.map((column) => (
-              <th key={column.id} className="min-w-[120px] border border-slate-200 bg-slate-50 px-2 py-2 text-center text-xs font-semibold text-slate-700">
+              <th
+                key={column.id}
+                style={{ minWidth: visitColumnWidth, width: visitColumnWidth }}
+                className="border border-slate-200 bg-slate-50 px-1.5 py-1.5 text-center text-[11px] font-semibold text-slate-700"
+              >
                 {editable ? (
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <input
                       value={column.visit}
                       onChange={(event) => onColumnChange?.(column.id, { visit: event.target.value })}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-center text-xs font-semibold text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                      title={column.visit}
+                      className="w-full min-w-0 rounded-md border border-slate-200 bg-white px-1.5 py-1.5 text-center text-[11px] font-semibold leading-tight text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                     />
                     <input
                       value={column.footnote}
                       onChange={(event) => onColumnChange?.(column.id, { footnote: event.target.value })}
                       placeholder="Footnote"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-[10px] text-slate-600 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                      title={column.footnote}
+                      className="w-full min-w-0 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-center text-[9px] leading-tight text-slate-600 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                     />
                     {schedule.columns.length > 1 && (
                       <button
                         onClick={() => onRemoveColumn?.(column.id)}
-                        className="inline-flex items-center justify-center rounded-full border border-rose-200 p-1.5 text-rose-600 transition hover:bg-rose-50"
+                        className="inline-flex items-center justify-center rounded-full border border-rose-200 p-1 text-rose-600 transition hover:bg-rose-50"
                         aria-label="Remove visit column"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3 w-3" />
                       </button>
                     )}
                   </div>
@@ -6740,51 +8489,60 @@ function ScheduleTable({
                 return (
                   <tr key={row.id} className="align-top odd:bg-white even:bg-slate-50/50">
                     <td
-                      className={`sticky left-0 z-20 border border-slate-200 px-2 py-2 shadow-[2px_0_0_rgba(226,232,240,0.95)] ${stickyCellBg}`}
+                      style={{ left: 0, minWidth: stickySectionWidth, width: stickySectionWidth }}
+                      className={`sticky z-20 border border-slate-200 px-2 py-2 shadow-[2px_0_0_rgba(226,232,240,0.95)] ${stickyCellBg}`}
                     >
                       {editable ? (
                         <input
                           value={row.group}
                           onChange={(event) => onRowChange?.(row.id, { group: event.target.value })}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                          title={row.group}
+                          className="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-semibold uppercase leading-tight tracking-[0.04em] text-slate-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                         />
                       ) : (
                         <div className="px-1 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{group.group}</div>
                       )}
                     </td>
                     <td
-                      className={`sticky left-[180px] z-20 border border-slate-200 px-2 py-2 shadow-[2px_0_0_rgba(226,232,240,0.95)] ${stickyCellBg}`}
+                      style={{ left: stickySectionWidth, minWidth: stickyActivityWidth, width: stickyActivityWidth }}
+                      className={`sticky z-20 border border-slate-200 px-2 py-2 shadow-[2px_0_0_rgba(226,232,240,0.95)] ${stickyCellBg}`}
                     >
                       {editable ? (
                         <input
                           value={row.activity}
                           onChange={(event) => onRowChange?.(row.id, { activity: event.target.value })}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                          title={row.activity}
+                          className="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs leading-tight text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                         />
                       ) : (
                         <div className="min-w-[240px] px-1 py-1 text-sm text-slate-700">{row.activity}</div>
                       )}
                     </td>
                     {schedule.columns.map((column) => (
-                      <td key={`${row.id}-${column.id}`} className="border border-slate-200 px-2 py-2">
+                      <td
+                        key={`${row.id}-${column.id}`}
+                        style={{ minWidth: visitColumnWidth, width: visitColumnWidth }}
+                        className="border border-slate-200 px-1.5 py-1.5"
+                      >
                         {editable ? (
                           <input
                             value={row.cells[column.id] || ""}
                             onChange={(event) => onCellChange?.(row.id, column.id, event.target.value)}
-                            className="w-full min-w-[90px] rounded-xl border border-slate-200 bg-white px-2 py-2 text-center text-sm text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                            title={row.cells[column.id] || ""}
+                            className="w-full min-w-0 truncate rounded-lg border border-slate-200 bg-white px-1.5 py-1.5 text-center text-xs text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                           />
                         ) : (
                           <div className="min-w-[90px] px-1 py-1 text-center text-sm text-slate-700">{row.cells[column.id] || ""}</div>
                         )}
                       </td>
                     ))}
-                    <td className="border border-slate-200 px-2 py-2">
+                    <td style={{ minWidth: notesColumnWidth, width: notesColumnWidth }} className="border border-slate-200 px-2 py-2">
                       {editable ? (
                         <textarea
                           value={row.notes}
                           onChange={(event) => onRowChange?.(row.id, { notes: event.target.value })}
                           rows={2}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                         />
                       ) : (
                         <div className="min-w-[200px] px-1 py-1 text-sm text-slate-600">{row.notes || ""}</div>
@@ -6889,20 +8647,23 @@ function ImpactAssessmentPanel({ assessment }: { assessment: ImpactAssessment })
   )
 }
 
-function ScheduleInsightsPanel({ insights }: { insights: ScheduleInsights }) {
-  const hasInsights =
-    insights.generatedAt && (insights.complexity.drivers.length > 0 || insights.tradeoff.recommendations.length > 0)
+function ScheduleInsightsPanel({ insights, mode }: { insights: ScheduleInsights; mode: ScheduleInsightMode }) {
+  const hasComplexity = Boolean(insights.generatedAt && insights.complexity.executiveSummary)
+  const hasTradeoff = Boolean(insights.generatedAt && insights.tradeoff.executiveSummary)
+  const hasInsights = mode === "complexity" ? hasComplexity : hasTradeoff
 
   if (!hasInsights) {
     return (
       <div className="rounded-[24px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
-        Run the SoA analysis to score trial complexity and identify lower-risk visit or assessment reductions.
+        {mode === "complexity"
+          ? "Run complexity assessment to score visit, assessment, and operational burden."
+          : "Run trade-off analysis to identify lower-risk visit or assessment reductions."}
       </div>
     )
   }
 
-  return (
-    <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+  if (mode === "complexity") {
+    return (
       <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -6946,7 +8707,10 @@ function ScheduleInsightsPanel({ insights }: { insights: ScheduleInsights }) {
           </ul>
         </div>
       </section>
+    )
+  }
 
+  return (
       <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -7009,7 +8773,6 @@ function ScheduleInsightsPanel({ insights }: { insights: ScheduleInsights }) {
           </ul>
         </div>
       </section>
-    </div>
   )
 }
 
@@ -7019,6 +8782,7 @@ export default function StudySynopsisStudio() {
   const [projectNameDraft, setProjectNameDraft] = useState("")
   const [isEditingProjectName, setIsEditingProjectName] = useState(false)
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]["id"]>("study")
+  const [workflowOptions, setWorkflowOptions] = useState<WorkflowOptions>(initialWorkflowOptions)
   const [study, setStudy] = useState<StudyForm>(initialStudyForm)
   const [outcomeEditorItems, setOutcomeEditorItems] = useState<StructuredEditorItem[]>([])
   const [secondaryObjectiveItems, setSecondaryObjectiveItems] = useState<StructuredEditorItem[]>([])
@@ -7070,6 +8834,12 @@ export default function StudySynopsisStudio() {
   const [isCustomDisease, setIsCustomDisease] = useState(false)
   const [openHelpTab, setOpenHelpTab] = useState<TabId | null>(null)
   const [openAiAssistantModal, setOpenAiAssistantModal] = useState<AiAssistantModalKind | null>(null)
+  const [openProtocolGuardrailModal, setOpenProtocolGuardrailModal] = useState(false)
+  const [openImpactAssessmentModal, setOpenImpactAssessmentModal] = useState(false)
+  const [openScheduleInsightsModal, setOpenScheduleInsightsModal] = useState(false)
+  const [scheduleInsightsModalMode, setScheduleInsightsModalMode] = useState<ScheduleInsightMode>("complexity")
+  const [runningScheduleInsightMode, setRunningScheduleInsightMode] = useState<ScheduleInsightMode | null>(null)
+  const [openScheduleRegenerationModal, setOpenScheduleRegenerationModal] = useState(false)
   const [populationSuggestionSource, setPopulationSuggestionSource] = useState<PopulationSuggestionSource>("population")
   const [studyTypeReviewNotice, setStudyTypeReviewNotice] = useState<StudyTypeReviewNotice | null>(null)
 
@@ -7106,6 +8876,7 @@ export default function StudySynopsisStudio() {
   const applyWorkspaceSnapshot = (snapshot: WorkspaceSnapshot) => {
     const normalized = normalizeWorkspaceSnapshot(snapshot)
     setActiveTab(normalized.activeTab)
+    setWorkflowOptions(normalized.workflowOptions)
     setStudy(normalized.study)
     setOutcomeEditorItems(parseStructuredEditorItems(normalized.study.outcomes || ""))
     setSecondaryObjectiveItems(parseStructuredEditorItems(normalized.study.secondaryObjectives || ""))
@@ -7134,6 +8905,12 @@ export default function StudySynopsisStudio() {
     setStudyTypeReviewNotice(null)
     setOpenHelpTab(null)
     setOpenAiAssistantModal(null)
+    setOpenProtocolGuardrailModal(false)
+    setOpenImpactAssessmentModal(false)
+    setOpenScheduleInsightsModal(false)
+    setScheduleInsightsModalMode("complexity")
+    setRunningScheduleInsightMode(null)
+    setOpenScheduleRegenerationModal(false)
     setPopulationSuggestionSource("population")
     setApiError("")
     setApiNotice("")
@@ -7186,6 +8963,7 @@ export default function StudySynopsisStudio() {
 
   const buildCurrentWorkspaceSnapshot = (savedAtOverride = savedAt || ""): WorkspaceSnapshot => ({
     activeTab,
+    workflowOptions: { ...workflowOptions },
     study: normalizeStudyForm(study),
     studySchema: normalizeStudySchema(studySchema),
     pico: { ...pico },
@@ -7394,43 +9172,104 @@ export default function StudySynopsisStudio() {
   const picoMissing = validatePicoAndStats(pico, stats)
   const sampleSizeEstimateMissing = getSampleSizeEstimateMissing(stats)
   const sampleSizeSuggestions = buildSampleSizeSuggestions(study, pico, stats)
+  const sampleSizeGenerationPlan = buildSampleSizeGenerationPlan(study, sampleSizeEstimate)
   const literatureMissing = validateLiterature(literature)
   const scheduleMissing = validateSchedule(schedule)
   const studyReady = studyMissing.length === 0
   const studySchemaReady = studySchemaMissing.length === 0
-  const picoReady = Boolean(pico.population && pico.intervention && pico.outcomes && stats.endpointType)
-  const literatureReady = Boolean(literature.pubmedQuery && literature.backgroundThemes)
-  const scheduleReady = Boolean(schedule.columns.length && schedule.rows.length)
+  const picoReadyBase = Boolean(pico.population && pico.intervention && pico.outcomes && stats.endpointType)
+  const literatureReadyBase = Boolean(literature.pubmedQuery && literature.backgroundThemes)
+  const scheduleReadyBase = scheduleMissing.length === 0
   const scheduleInsightsReady = Boolean(
     scheduleInsights.generatedAt &&
       (scheduleInsights.complexity.drivers.length > 0 || scheduleInsights.tradeoff.recommendations.length > 0),
   )
   const showReviewGates = false
   const includedSections = sections.filter((section) => section.included)
-  const showScheduleTab = study.category === "interventional"
+  const scheduleEligible = isScheduleEligibleStudy(study)
+  const showLiteratureTab = workflowOptions.useLiterature
+  const showScheduleTab = scheduleEligible
   const isEvidenceSynthesisStudy = study.category === "evidence-synthesis"
-  const visibleTabs = TABS.filter((tab) => tab.id !== "schedule" || showScheduleTab)
+  const visibleTabs = TABS.filter((tab) => {
+    if (tab.id === "literature") return showLiteratureTab
+    if (tab.id === "schedule") return showScheduleTab
+    return true
+  })
   const tabIndexById = Object.fromEntries(visibleTabs.map((tab, index) => [tab.id, index + 1])) as Record<
     (typeof TABS)[number]["id"],
     number
   >
   const scheduleTablePresentation = getScheduleTablePresentation(schedule)
   const canSplitScheduleTable = schedule.columns.length >= 4
+  const resolvedScheduleStructureMode = getResolvedScheduleStructureMode(study, schedule)
+  const resolvedScheduleStructureOption = getScheduleStructureOption(resolvedScheduleStructureMode)
   const studySchemaFingerprint = buildStudySchemaFingerprint(study)
   const studySchemaGenerated = Boolean(studySchema.generatedAt && studySchema.lanes.length && studySchema.nodes.length)
   const studySchemaStale = Boolean(
     studySchemaGenerated && studySchema.sourceFingerprint && studySchema.sourceFingerprint !== studySchemaFingerprint,
   )
+  const picoStale = Boolean(
+    picoReadyBase &&
+      ((pico.sourceFingerprint && pico.sourceFingerprint !== studySchemaFingerprint) ||
+        (stats.sourceFingerprint && stats.sourceFingerprint !== studySchemaFingerprint)),
+  )
+  const literatureStale = Boolean(
+    workflowOptions.useLiterature &&
+      literatureReadyBase &&
+      literature.sourceFingerprint &&
+      literature.sourceFingerprint !== studySchemaFingerprint,
+  )
+  const scheduleStale = Boolean(
+    showScheduleTab &&
+      scheduleReadyBase &&
+      schedule.sourceFingerprint &&
+      schedule.sourceFingerprint !== studySchemaFingerprint,
+  )
+  const sectionsStale = sections.some(
+    (section) => Boolean(section.body || section.lastGeneratedAt) && Boolean(section.sourceFingerprint) && section.sourceFingerprint !== studySchemaFingerprint,
+  )
+  const finalStale = finalSections.some(
+    (section) => Boolean(section.sourceFingerprint) && section.sourceFingerprint !== studySchemaFingerprint,
+  )
+  const staleDownstreamItems = [
+    studySchemaStale ? "study schema" : "",
+    picoStale ? "PICO & stats" : "",
+    workflowOptions.useLiterature && literatureStale ? "literature plan" : "",
+    showScheduleTab && scheduleStale ? "schedule" : "",
+    sectionsStale ? "section drafts" : "",
+    finalStale ? "final synopsis" : "",
+  ].filter(Boolean)
+  const hasStaleDownstream = staleDownstreamItems.length > 0
+  const picoReady = picoReadyBase && !picoStale
+  const literatureReady = literatureReadyBase && !literatureStale
+  const scheduleReady = scheduleReadyBase && !scheduleStale
+  const literatureSatisfied = !workflowOptions.useLiterature || literatureReady
+  const scheduleSatisfied = true
+  const picoBlocking = picoStale ? ["Refresh or review stale PICO & Stats"] : picoMissing
+  const literatureBlocking = literatureStale ? ["Refresh or review stale Literature plan"] : literatureMissing
+  const scheduleBlocking = scheduleStale ? ["Refresh or review stale Schedule of Activities"] : scheduleMissing
   const currentProjectMeta = projectMetas.find((project) => project.id === currentProjectId) || null
   const currentProjectName = currentProjectMeta?.name || normalizeProjectName(projectNameDraft, "New synopsis")
   const selectedEvidenceUseIntents = Array.isArray(study.secondaryEvidenceUseIntents) ? study.secondaryEvidenceUseIntents : []
   const selectedStrategicObjectives = Array.isArray(study.secondaryStrategicObjectives) ? study.secondaryStrategicObjectives : []
   const primaryIntentAlignment = buildPrimaryIntentAlignment(study)
+  const suggestedProtocolGuardrailProfile = getSuggestedProtocolGuardrailProfile(study)
+  const resolvedProtocolGuardrailProfile = getResolvedProtocolGuardrailProfile(study)
+  const protocolGuardrailAssessment = buildProtocolGuardrailAssessment(study)
+  const protocolGuardrailNeedsAttention = protocolGuardrailAssessment.checks.some((check) => check.status !== "aligned")
   const objectiveSuggestionReady = objectiveSuggestionMissing.length === 0
   const endpointSuggestionReady = endpointSuggestionMissing.length === 0
   const populationDraftReady = populationDraftMissing.length === 0
   const eligibilitySuggestionReady = eligibilitySuggestionMissing.length === 0
   const impactAssessmentReady = impactAssessmentMissing.length === 0
+  const impactAssessmentButtonLabel =
+    loadingAction === "impact"
+      ? "Assessing..."
+      : !impactAssessmentReady
+        ? `Add ${impactAssessmentMissing.slice(0, 2).join(" + ")}${impactAssessmentMissing.length > 2 ? "..." : ""}`
+        : impactAssessment.generatedAt
+          ? "Refresh impact view"
+          : "Assess study impact"
   const sampleSizeEstimateReady = sampleSizeEstimateMissing.length === 0
   const hasObjectiveSuggestionDraft = Boolean(
     objectiveSuggestionDraft.primaryObjective ||
@@ -7496,12 +9335,14 @@ export default function StudySynopsisStudio() {
   const objectiveApplySummary = buildObjectiveApplySummary(objectiveSuggestionSelection)
   const populationApplySummary = buildPopulationApplySummary(populationSuggestionSelection)
   const endpointApplySummary = buildEndpointApplySummary(selectedEndpointSuggestionCount)
+  const picoEntryMissing = studySchemaMissing
+  const picoEntryReady = picoEntryMissing.length === 0
   const gates = {
-    pico: studyReady,
+    pico: picoEntryReady,
     literature: studyReady && picoReady,
-    schedule: showScheduleTab && studyReady && picoReady && literatureReady,
-    sections: studyReady && picoReady && literatureReady && (!showScheduleTab || scheduleReady),
-    final: studyReady && picoReady && literatureReady && (!showScheduleTab || scheduleReady),
+    schedule: showScheduleTab && studyReady,
+    sections: studyReady && picoReady && literatureSatisfied && scheduleSatisfied,
+    final: studyReady && picoReady && literatureSatisfied && scheduleSatisfied && !sectionsStale,
   }
 
   useEffect(() => {
@@ -7555,10 +9396,16 @@ export default function StudySynopsisStudio() {
   }, [study.customDisease])
 
   useEffect(() => {
-    if (!showScheduleTab && activeTab === "schedule") {
+    if ((!showScheduleTab && activeTab === "schedule") || (!showLiteratureTab && activeTab === "literature")) {
       setActiveTab("study")
     }
-  }, [activeTab, showScheduleTab])
+  }, [activeTab, showLiteratureTab, showScheduleTab])
+
+  useEffect(() => {
+    if (!scheduleEligible && workflowOptions.useSchedule) {
+      setWorkflowOptions((current) => ({ ...current, useSchedule: false }))
+    }
+  }, [scheduleEligible, workflowOptions.useSchedule])
 
   useEffect(() => {
     if (!hydrated || !studySchema.generatedAt || studySchema.manualEdited) {
@@ -7583,6 +9430,9 @@ export default function StudySynopsisStudio() {
       const compacted = buildStudySchemaFromStudy(study, {
         orientation: current.orientation,
         detailLevel: current.detailLevel,
+        designPattern: current.designPattern,
+        useCase: current.useCase,
+        contentBlocks: current.contentBlocks,
         iterationPrompt: current.iterationPrompt,
         theme: current.theme,
       })
@@ -7635,6 +9485,7 @@ export default function StudySynopsisStudio() {
     study,
     studyDocumentImportReport,
     studySchema,
+    workflowOptions,
   ])
 
   const updateStudy = <K extends keyof StudyForm>(key: K, value: StudyForm[K]) => {
@@ -7682,7 +9533,7 @@ export default function StudySynopsisStudio() {
   }
 
   const updatePico = <K extends keyof PicoForm>(key: K, value: PicoForm[K]) => {
-    setPico((current) => ({ ...current, [key]: value }))
+    setPico((current) => ({ ...current, [key]: value, sourceFingerprint: studySchemaFingerprint }))
     clearSampleSizeEstimate()
     setFinalSections([])
     clearScheduleInsights()
@@ -7696,7 +9547,7 @@ export default function StudySynopsisStudio() {
   }
 
   const updateStats = <K extends keyof StatsForm>(key: K, value: StatsForm[K]) => {
-    setStats((current) => ({ ...current, [key]: value }))
+    setStats((current) => ({ ...current, [key]: value, sourceFingerprint: studySchemaFingerprint }))
     clearSampleSizeEstimate()
     setFinalSections([])
     clearScheduleInsights()
@@ -7710,7 +9561,7 @@ export default function StudySynopsisStudio() {
   }
 
   const handleStatsEditorChange = (value: string) => {
-    setStats((current) => parseStatsEditorText(value, current))
+    setStats((current) => ({ ...parseStatsEditorText(value, current), sourceFingerprint: studySchemaFingerprint }))
     clearSampleSizeEstimate()
     setFinalSections([])
     clearScheduleInsights()
@@ -7735,6 +9586,7 @@ export default function StudySynopsisStudio() {
         next[suggestion.key] = suggestion.value as StatsForm[typeof suggestion.key]
       })
 
+      next.sourceFingerprint = studySchemaFingerprint
       return next
     })
     clearSampleSizeEstimate()
@@ -7750,7 +9602,7 @@ export default function StudySynopsisStudio() {
   }
 
   const updateLiterature = <K extends keyof LiteratureForm>(key: K, value: LiteratureForm[K]) => {
-    setLiterature((current) => ({ ...current, [key]: value }))
+    setLiterature((current) => ({ ...current, [key]: value, sourceFingerprint: studySchemaFingerprint }))
     setFinalSections([])
     clearScheduleInsights()
     setApiNotice("")
@@ -7785,6 +9637,48 @@ export default function StudySynopsisStudio() {
     setApiNotice("")
   }
 
+  const applyJAndJStudySchemaPalette = () => {
+    setStudySchema((current) =>
+      normalizeStudySchema({
+        ...current,
+        theme: J_AND_J_STUDY_SCHEMA_THEME,
+        provenance: current.generatedAt ? "hybrid" : "manual",
+        manualEdited: true,
+      }),
+    )
+    setApiNotice("")
+  }
+
+  const handleStudySchemaUseCaseChange = (useCase: StudySchemaUseCase) => {
+    setStudySchema((current) =>
+      normalizeStudySchema({
+        ...current,
+        useCase,
+        contentBlocks: STUDY_SCHEMA_USE_CASE_PRESETS[useCase],
+        provenance: current.generatedAt ? "hybrid" : "manual",
+        manualEdited: true,
+      }),
+    )
+    setApiNotice("")
+  }
+
+  const toggleStudySchemaContentBlock = (block: StudySchemaContentBlock) => {
+    setStudySchema((current) => {
+      const existing = Array.isArray(current.contentBlocks) ? current.contentBlocks : []
+      const nextBlocks = existing.includes(block)
+        ? existing.filter((item) => item !== block)
+        : [...existing, block]
+
+      return normalizeStudySchema({
+        ...current,
+        contentBlocks: nextBlocks.length ? nextBlocks : existing,
+        provenance: current.generatedAt ? "hybrid" : "manual",
+        manualEdited: true,
+      })
+    })
+    setApiNotice("")
+  }
+
   const updateStudySchemaLane = (laneId: string, updates: Partial<StudySchemaLane>) => {
     setStudySchema((current) =>
       normalizeStudySchema({
@@ -7815,6 +9709,7 @@ export default function StudySynopsisStudio() {
       return {
         ...current,
         [key]: value,
+        sourceFingerprint: editingContent ? studySchemaFingerprint : current.sourceFingerprint,
         provenance: editingContent
           ? current.generatedAt
             ? "hybrid"
@@ -7838,6 +9733,7 @@ export default function StudySynopsisStudio() {
     setSchedule((current) => ({
       ...current,
       rows: current.rows.map((row) => (row.id === rowId ? { ...row, ...updates } : row)),
+      sourceFingerprint: studySchemaFingerprint,
       provenance: current.generatedAt ? "hybrid" : "manual",
       manualEdited: true,
     }))
@@ -7863,6 +9759,7 @@ export default function StudySynopsisStudio() {
       ),
       provenance: current.generatedAt ? "hybrid" : "manual",
       manualEdited: true,
+      sourceFingerprint: studySchemaFingerprint,
     }))
     setFinalSections([])
     clearScheduleInsights()
@@ -7879,6 +9776,7 @@ export default function StudySynopsisStudio() {
       columns: current.columns.map((column) => (column.id === columnId ? { ...column, ...updates } : column)),
       provenance: current.generatedAt ? "hybrid" : "manual",
       manualEdited: true,
+      sourceFingerprint: studySchemaFingerprint,
     }))
     setFinalSections([])
     clearScheduleInsights()
@@ -7895,6 +9793,7 @@ export default function StudySynopsisStudio() {
       columns: current.columns.map((column) => (columnIds.includes(column.id) ? { ...column, [level]: value } : column)),
       provenance: current.generatedAt ? "hybrid" : "manual",
       manualEdited: true,
+      sourceFingerprint: studySchemaFingerprint,
     }))
     setFinalSections([])
     clearScheduleInsights()
@@ -7925,6 +9824,7 @@ export default function StudySynopsisStudio() {
         })),
         provenance: current.generatedAt ? "hybrid" : "manual",
         manualEdited: true,
+        sourceFingerprint: studySchemaFingerprint,
       }
     })
     setFinalSections([])
@@ -7947,6 +9847,7 @@ export default function StudySynopsisStudio() {
       }),
       provenance: current.generatedAt ? "hybrid" : "manual",
       manualEdited: true,
+      sourceFingerprint: studySchemaFingerprint,
     }))
     setFinalSections([])
     clearScheduleInsights()
@@ -7970,8 +9871,10 @@ export default function StudySynopsisStudio() {
           cells: Object.fromEntries(current.columns.map((column) => [column.id, ""])) as Record<string, string>,
         },
       ],
+      tableLayout: "single",
       provenance: current.generatedAt ? "hybrid" : "manual",
       manualEdited: true,
+      sourceFingerprint: studySchemaFingerprint,
     }))
     setFinalSections([])
     clearScheduleInsights()
@@ -7988,6 +9891,7 @@ export default function StudySynopsisStudio() {
       rows: current.rows.filter((row) => row.id !== rowId),
       provenance: current.generatedAt ? "hybrid" : "manual",
       manualEdited: true,
+      sourceFingerprint: studySchemaFingerprint,
     }))
     setFinalSections([])
     clearScheduleInsights()
@@ -8020,6 +9924,8 @@ export default function StudySynopsisStudio() {
                 : "manual"
               : section.provenance,
           manualEdited: section.manualEdited || bodyChanged || titleChanged || promptChanged,
+          sourceFingerprint:
+            bodyChanged || titleChanged || promptChanged ? studySchemaFingerprint : section.sourceFingerprint,
           sourceTabs: updates.title ? getSectionSourceTabs(updates.title) : section.sourceTabs,
           assumptionFlags: updates.title ? getDefaultAssumptions(updates.title) : section.assumptionFlags,
         }
@@ -8042,13 +9948,24 @@ export default function StudySynopsisStudio() {
   const callOpenAI = async <T,>(payload: unknown) => {
     setApiError("")
     setApiNotice("")
+    const payloadObject =
+      payload && typeof payload === "object" && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : null
+    const enrichedPayload =
+      payloadObject && payloadObject.study
+        ? {
+            ...payloadObject,
+            study: buildStudyForAi(payloadObject.study as StudyForm),
+          }
+        : payload
 
-    const response = await fetch("/api/openai", {
+    const response = await fetch(apiUrl("/api/openai"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(enrichedPayload),
     })
 
     const data = await response.json()
@@ -8060,11 +9977,57 @@ export default function StudySynopsisStudio() {
     return data as T
   }
 
+  const handleKeepCurrentDownstream = () => {
+    setStudySchema((current) =>
+      normalizeStudySchema({
+        ...current,
+        sourceFingerprint: current.generatedAt ? studySchemaFingerprint : current.sourceFingerprint,
+      }),
+    )
+    setPico((current) => ({ ...current, sourceFingerprint: picoReadyBase ? studySchemaFingerprint : current.sourceFingerprint }))
+    setStats((current) => ({ ...current, sourceFingerprint: picoReadyBase ? studySchemaFingerprint : current.sourceFingerprint }))
+    setLiterature((current) => ({
+      ...current,
+      sourceFingerprint: literatureReadyBase ? studySchemaFingerprint : current.sourceFingerprint,
+    }))
+    setSchedule((current) =>
+      normalizeSchedule({
+        ...current,
+        sourceFingerprint: scheduleReadyBase ? studySchemaFingerprint : current.sourceFingerprint,
+      }),
+    )
+    setSections((current) =>
+      current.map((section) =>
+        section.body || section.lastGeneratedAt ? { ...section, sourceFingerprint: studySchemaFingerprint } : section,
+      ),
+    )
+    setFinalSections((current) => current.map((section) => ({ ...section, sourceFingerprint: studySchemaFingerprint })))
+    setApiNotice("Current downstream content was marked as reviewed against the latest Study Design inputs.")
+  }
+
+  const handleClearDownstreamDrafts = () => {
+    if (!window.confirm("Clear PICO, literature, schedule, section drafts, and final synopsis generated from prior inputs?")) {
+      return
+    }
+
+    setPico(initialPicoForm)
+    setStats(initialStatsForm)
+    setLiterature(initialLiteratureForm)
+    setSchedule(initialScheduleForm)
+    setSections(buildDefaultSections)
+    setFinalSections([])
+    clearSampleSizeEstimate()
+    clearScheduleInsights()
+    setApiNotice("Downstream drafts were cleared. Regenerate from the current Study Design when ready.")
+  }
+
   const handleGenerateStudySchema = async () => {
     if (studySchemaMissing.length) {
       setApiError(`Add ${studySchemaMissing.join(", ")} before generating the study schema.`)
       return
     }
+
+    const schemaTheme = J_AND_J_STUDY_SCHEMA_THEME
 
     setLoadingAction("schema")
 
@@ -8073,23 +10036,27 @@ export default function StudySynopsisStudio() {
         action: "generate_study_schema",
         study,
         requestNote: studySchema.iterationPrompt,
+        designPattern: getResolvedStudySchemaDesignPattern(study, studySchema),
         orientation: "horizontal",
         detailLevel: studySchema.detailLevel,
       })
 
-      setStudySchema(shapeGeneratedStudySchema(study, studySchema, result))
+      setStudySchema(shapeGeneratedStudySchema(study, { ...studySchema, theme: schemaTheme }, result))
       setActiveTab("schema")
     } catch (error) {
       setStudySchema(
         buildStudySchemaFromStudy(study, {
           orientation: "horizontal",
           detailLevel: studySchema.detailLevel,
+          designPattern: studySchema.designPattern,
+          useCase: studySchema.useCase,
+          contentBlocks: studySchema.contentBlocks,
           iterationPrompt: studySchema.iterationPrompt,
-          theme: studySchema.theme,
+          theme: schemaTheme,
         }),
       )
       setApiNotice(
-        `OpenAI study-schema generation failed, so the app used a local schema draft instead. ${
+        `OpenAI study-schema generation failed, so the app used a local schema draft instead. Treat it as a layout aid, not validated evidence. ${
           error instanceof Error ? error.message : "Unable to generate the study schema."
         }`,
       )
@@ -8099,7 +10066,7 @@ export default function StudySynopsisStudio() {
     }
   }
 
-  const handleExportStudySchema = async (format: "svg" | "png") => {
+  const handleExportStudySchema = async (format: "svg" | "png" | "pptx") => {
     if (!studySchema.lanes.length || !studySchema.nodes.length) {
       setApiError("Generate the study schema before exporting it.")
       return
@@ -8107,6 +10074,19 @@ export default function StudySynopsisStudio() {
 
     const svgMarkup = buildStudySchemaSvgMarkup(studySchema, study)
     const baseName = slugify(`${study.studyTitle || "study"}-schema`)
+
+    if (format === "pptx") {
+      try {
+        await exportStudySchemaToEditablePptx(studySchema, study, `${baseName}.pptx`)
+      } catch (error) {
+        setApiError(
+          `Editable PowerPoint export failed. ${
+            error instanceof Error ? error.message : "Unable to generate the PPTX file."
+          }`,
+        )
+      }
+      return
+    }
 
     if (format === "svg") {
       const blob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" })
@@ -8681,7 +10661,7 @@ export default function StudySynopsisStudio() {
       setObjectiveSuggestionSelection(createObjectiveSuggestionSelection(fallback.primary))
       setObjectiveSuggestionGuidance(fallback.guidance)
       setApiNotice(
-        `OpenAI objective suggestion failed, so the app used a local draft instead. ${
+        `OpenAI objective suggestion failed, so the app used a local draft instead. Review alignment before accepting. ${
           error instanceof Error ? error.message : "Unable to suggest study objectives."
         }`,
       )
@@ -8722,7 +10702,7 @@ export default function StudySynopsisStudio() {
       setEndpointSuggestionSelection(createEndpointSuggestionSelection(fallback.primary))
       setEndpointSuggestionGuidance(fallback.guidance)
       setApiNotice(
-        `OpenAI endpoint suggestion failed, so the app used a local draft instead. ${
+        `OpenAI endpoint suggestion failed, so the app used a local draft instead. Review endpoint focus before accepting. ${
           error instanceof Error ? error.message : "Unable to suggest endpoints."
         }`,
       )
@@ -8760,7 +10740,7 @@ export default function StudySynopsisStudio() {
       setPopulationSuggestionDraft(fallback)
       setPopulationSuggestionSelection(createPopulationSuggestionSelection(fallback, source))
       setApiNotice(
-        `OpenAI ${source === "population" ? "population" : "eligibility"} suggestion failed, so the app used a local draft instead. ${
+        `OpenAI ${source === "population" ? "population" : "eligibility"} suggestion failed, so the app used a local draft instead. Review eligibility and feasibility manually. ${
           error instanceof Error ? error.message : "Unable to suggest the patient population."
         }`,
       )
@@ -8802,10 +10782,12 @@ export default function StudySynopsisStudio() {
       })
 
       setImpactAssessment(normalizeImpactAssessment({ ...result, generatedAt: result.generatedAt || new Date().toISOString() }))
+      setOpenImpactAssessmentModal(true)
     } catch (error) {
       setImpactAssessment(buildImpactAssessmentFromStudy(study))
+      setOpenImpactAssessmentModal(true)
       setApiNotice(
-        `OpenAI impact assessment failed, so the app used a local evidence-impact view instead. ${
+        `OpenAI impact assessment failed, so the app used a local evidence-impact view instead. Treat it as directional only. ${
           error instanceof Error ? error.message : "Unable to assess current study impact."
         }`,
       )
@@ -8863,6 +10845,7 @@ export default function StudySynopsisStudio() {
     }
 
     setStudy((current) => ({
+      ...current,
       ...(() => {
         const currentOutcomeItems = splitStructuredEditorItems(current.outcomes || "")
         const mergedOutcomeItems = uniqueItemsCaseInsensitive([...currentOutcomeItems, ...selectedSuggestedEndpoints])
@@ -8920,24 +10903,47 @@ export default function StudySynopsisStudio() {
     }))
   }
 
+  const updateWorkflowOption = (key: keyof WorkflowOptions, value: boolean) => {
+    if (key === "useSchedule" && value && !scheduleEligible) {
+      setApiError(getScheduleEligibilityLabel(study))
+      return
+    }
+
+    setWorkflowOptions((current) => ({ ...current, [key]: value }))
+    setApiError("")
+    setApiNotice(
+      key === "useLiterature"
+        ? value
+          ? "Literature planning enabled. It will inform background/rationale if you generate it."
+          : "Literature planning skipped. The synopsis will not claim literature-search support."
+        : value
+          ? "Schedule of Activities enabled. Generate it if planned visits or assessment timing are needed."
+          : "Schedule of Activities skipped. It will not block section drafting or final generation.",
+    )
+
+    if (!value && activeTab === (key === "useLiterature" ? "literature" : "schedule")) {
+      setActiveTab("study")
+    }
+  }
+
   const handleTabChange = (tab: (typeof TABS)[number]["id"]) => {
     if (tab === "pico" && !gates.pico) {
-      setApiError(`Complete the Study Design tab first: ${studyMissing.join(", ")}.`)
+      setApiError(`Add the core Study Design inputs first: ${picoEntryMissing.join(", ")}.`)
       return
     }
 
     if (tab === "literature" && !gates.literature) {
       setApiError(
-        studyMissing.length
-          ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
-          : `Complete PICO & Stats first: ${picoMissing.join(", ")}.`,
+          studyMissing.length
+            ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
+          : `Complete PICO & Stats first: ${picoBlocking.join(", ")}.`,
       )
       return
     }
 
     if (tab === "schedule") {
       if (!showScheduleTab) {
-        setApiError("The Schedule of Activities tab is available only for interventional studies.")
+        setApiError(getScheduleEligibilityLabel(study))
         return
       }
 
@@ -8945,25 +10951,36 @@ export default function StudySynopsisStudio() {
         setApiError(
           studyMissing.length
             ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
-            : picoMissing.length
-              ? `Complete PICO & Stats first: ${picoMissing.join(", ")}.`
-              : `Complete Literature first: ${literatureMissing.join(", ")}.`,
+            : "Complete the Study Design tab first before generating the schedule.",
         )
         return
       }
     }
 
-    if ((tab === "sections" || tab === "final") && !gates.sections) {
+    if (tab === "sections" && !gates.sections) {
       setApiError(
         studyMissing.length
           ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
-          : picoMissing.length
-            ? `Complete PICO & Stats first: ${picoMissing.join(", ")}.`
-            : literatureMissing.length
-              ? `Complete Literature first: ${literatureMissing.join(", ")}.`
-              : showScheduleTab
-                ? `Complete Schedule of Activities first: ${scheduleMissing.join(", ")}.`
-                : "Complete the prior tabs first before generating sections or the final synopsis.",
+          : picoBlocking.length
+            ? `Complete PICO & Stats first: ${picoBlocking.join(", ")}.`
+          : workflowOptions.useLiterature && literatureBlocking.length
+            ? `Complete Literature first: ${literatureBlocking.join(", ")}.`
+            : "Complete the prior tabs first before generating sections or the final synopsis.",
+      )
+      return
+    }
+
+    if (tab === "final" && !gates.final) {
+      setApiError(
+        studyMissing.length
+          ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
+          : picoBlocking.length
+            ? `Complete PICO & Stats first: ${picoBlocking.join(", ")}.`
+          : workflowOptions.useLiterature && literatureBlocking.length
+            ? `Complete Literature first: ${literatureBlocking.join(", ")}.`
+            : sectionsStale
+              ? "Refresh or review stale section drafts before generating the final synopsis."
+              : "Complete the prior tabs first before generating the final synopsis.",
       )
       return
     }
@@ -8974,8 +10991,8 @@ export default function StudySynopsisStudio() {
   }
 
   const handleExtractPico = async () => {
-    if (studyMissing.length) {
-      setApiError(`Complete the Study Design tab first: ${studyMissing.join(", ")}.`)
+    if (picoEntryMissing.length) {
+      setApiError(`Add the core Study Design inputs first: ${picoEntryMissing.join(", ")}.`)
       return
     }
 
@@ -8987,8 +11004,8 @@ export default function StudySynopsisStudio() {
         study,
       })
 
-      setPico(result.pico)
-      setStats(result.stats)
+      setPico({ ...result.pico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...result.stats, sourceFingerprint: studySchemaFingerprint })
       clearSampleSizeEstimate()
       clearScheduleInsights()
       setReviews((current) => ({
@@ -9012,7 +11029,7 @@ export default function StudySynopsisStudio() {
         schedule: { ...current.schedule, status: "pending", reviewedAt: "" },
       }))
       setApiNotice(
-        `OpenAI PICO/statistics extraction failed, so the app used a local draft instead. ${
+        `OpenAI PICO/statistics extraction failed, so the app used a local draft instead. Biostatistics assumptions require manual review. ${
           error instanceof Error ? error.message : "Unable to extract PICO and statistics."
         }`,
       )
@@ -9025,15 +11042,15 @@ export default function StudySynopsisStudio() {
   const handleBuildLiterature = async () => {
     if (!gates.literature) {
       setApiError(
-        studyMissing.length
-          ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
-          : `Complete PICO & Stats first: ${picoMissing.join(", ")}.`,
+          studyMissing.length
+            ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
+          : `Complete PICO & Stats first: ${picoBlocking.join(", ")}.`,
       )
       return
     }
 
-    if (picoMissing.length) {
-      setApiError(`Complete PICO & Stats first: ${picoMissing.join(", ")}.`)
+    if (picoBlocking.length) {
+      setApiError(`Complete PICO & Stats first: ${picoBlocking.join(", ")}.`)
       return
     }
 
@@ -9042,8 +11059,8 @@ export default function StudySynopsisStudio() {
 
     try {
       if (!pico.population && !pico.intervention && !pico.outcomes) {
-        setPico(fallbackPico)
-        setStats(buildStatsFromStudy(study, fallbackPico))
+        setPico({ ...fallbackPico, sourceFingerprint: studySchemaFingerprint })
+        setStats({ ...buildStatsFromStudy(study, fallbackPico), sourceFingerprint: studySchemaFingerprint })
       }
 
       const result = await callOpenAI<{ literature: LiteratureForm }>({
@@ -9052,7 +11069,7 @@ export default function StudySynopsisStudio() {
         pico: fallbackPico,
       })
 
-      setLiterature(result.literature)
+      setLiterature({ ...result.literature, sourceFingerprint: studySchemaFingerprint })
       clearScheduleInsights()
       setReviews((current) => ({
         ...current,
@@ -9069,7 +11086,7 @@ export default function StudySynopsisStudio() {
         schedule: { ...current.schedule, status: "pending", reviewedAt: "" },
       }))
       setApiNotice(
-        `OpenAI literature planning failed, so the app used a local draft instead. ${
+        `OpenAI literature planning failed, so the app used a local draft instead. Validate search logic before relying on it. ${
           error instanceof Error ? error.message : "Unable to generate the literature plan."
         }`,
       )
@@ -9081,7 +11098,7 @@ export default function StudySynopsisStudio() {
 
   const handleGenerateSchedule = async () => {
     if (!showScheduleTab) {
-      setApiError("The Schedule of Activities tab is only relevant for interventional studies.")
+      setApiError(getScheduleEligibilityLabel(study))
       return
     }
 
@@ -9089,16 +11106,18 @@ export default function StudySynopsisStudio() {
       setApiError(
         studyMissing.length
           ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
-          : picoMissing.length
-            ? `Complete PICO & Stats first: ${picoMissing.join(", ")}.`
-            : `Complete Literature first: ${literatureMissing.join(", ")}.`,
+          : "Complete the Study Design tab first before generating the schedule.",
       )
       return
     }
 
     const derivedPico = pico.population || pico.intervention || pico.outcomes ? pico : buildPicoFromStudy(study)
     const derivedStats = stats.endpointType ? stats : buildStatsFromStudy(study, derivedPico)
-    const derivedLiterature = literature.pubmedQuery ? literature : buildLiteratureFromState(study, derivedPico)
+    const derivedLiterature = workflowOptions.useLiterature
+      ? literature.pubmedQuery
+        ? literature
+        : buildLiteratureFromState(study, derivedPico)
+      : buildSkippedLiteraturePlan(study, derivedPico)
     const compiledPrompt = buildSchedulePromptFromState(study, derivedPico, derivedStats, derivedLiterature, schedule)
 
     setLoadingAction("schedule")
@@ -9120,18 +11139,20 @@ export default function StudySynopsisStudio() {
         schedule,
       })
 
-      setPico(derivedPico)
-      setStats(derivedStats)
-      setLiterature(derivedLiterature)
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
+      setLiterature({ ...derivedLiterature, sourceFingerprint: studySchemaFingerprint })
       setSchedule(
         normalizeSchedule({
           ...result,
           prompt: schedule.prompt || DEFAULT_SCHEDULE_PROMPT,
           iterationPrompt: schedule.iterationPrompt,
           tableLayout: schedule.tableLayout,
+          structureMode: schedule.structureMode,
           generatedAt: new Date().toISOString(),
           provenance: "ai_generated",
           manualEdited: false,
+          sourceFingerprint: studySchemaFingerprint,
         }),
       )
       clearScheduleInsights()
@@ -9141,14 +11162,15 @@ export default function StudySynopsisStudio() {
       }))
       setActiveTab("schedule")
     } catch (error) {
-      setPico(derivedPico)
-      setStats(derivedStats)
-      setLiterature(derivedLiterature)
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
+      setLiterature({ ...derivedLiterature, sourceFingerprint: studySchemaFingerprint })
       setSchedule(
         buildScheduleFromState(study, derivedPico, derivedStats, derivedLiterature, {
           prompt: schedule.prompt || DEFAULT_SCHEDULE_PROMPT,
           iterationPrompt: schedule.iterationPrompt,
           tableLayout: schedule.tableLayout,
+          structureMode: schedule.structureMode,
         }),
       )
       clearScheduleInsights()
@@ -9157,24 +11179,25 @@ export default function StudySynopsisStudio() {
         schedule: { ...current.schedule, status: "pending", reviewedAt: "" },
       }))
       setApiNotice(
-        `OpenAI schedule generation failed, so the app used a local schedule draft instead. ${
+        `OpenAI schedule generation failed, so the app used a local schedule draft instead. Review visit burden and endpoint-critical assessments manually. ${
           error instanceof Error ? error.message : "Unable to generate the schedule of activities."
         }`,
       )
       setActiveTab("schedule")
     } finally {
+      setOpenScheduleRegenerationModal(false)
       setLoadingAction(null)
     }
   }
 
   const handleAnalyzeScheduleInsights = async (focus: "complexity" | "tradeoff") => {
     if (!showScheduleTab) {
-      setApiError("Schedule analysis is available only for interventional studies.")
+      setApiError(getScheduleEligibilityLabel(study))
       return
     }
 
     if (!scheduleReady) {
-      setApiError(`Complete Schedule of Activities first: ${scheduleMissing.join(", ")}.`)
+      setApiError(`Complete Schedule of Activities first: ${scheduleBlocking.join(", ")}.`)
       return
     }
 
@@ -9186,6 +11209,7 @@ export default function StudySynopsisStudio() {
         : "Prioritize visit and assessment trade-off analysis, highlighting what can be reduced with the lowest data-quality risk."
 
     setLoadingAction("schedule_analysis")
+    setRunningScheduleInsightMode(focus)
 
     try {
       const result = await callOpenAI<Pick<ScheduleInsights, "complexity" | "tradeoff">>({
@@ -9197,27 +11221,33 @@ export default function StudySynopsisStudio() {
         focus: focusText,
       })
 
-      setPico(derivedPico)
-      setStats(derivedStats)
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
       setScheduleInsights(
         normalizeScheduleInsights({
           focus: focusText,
+          mode: focus,
           generatedAt: new Date().toISOString(),
           provenance: "ai_generated",
-          complexity: result.complexity,
-          tradeoff: result.tradeoff,
+          complexity: focus === "complexity" ? result.complexity : initialScheduleInsights.complexity,
+          tradeoff: focus === "tradeoff" ? result.tradeoff : initialScheduleInsights.tradeoff,
         }),
       )
+      setScheduleInsightsModalMode(focus)
+      setOpenScheduleInsightsModal(true)
     } catch (error) {
-      setPico(derivedPico)
-      setStats(derivedStats)
-      setScheduleInsights(buildScheduleInsightsFromState(study, derivedPico, derivedStats, schedule, focusText))
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
+      setScheduleInsights(buildScheduleInsightsFromState(study, derivedPico, derivedStats, schedule, focusText, focus))
+      setScheduleInsightsModalMode(focus)
+      setOpenScheduleInsightsModal(true)
       setApiNotice(
-        `OpenAI SoA analysis failed, so the app used a local complexity and trade-off assessment instead. ${
+        `OpenAI SoA analysis failed, so the app used a local complexity and trade-off assessment instead. Treat it as directional only. ${
           error instanceof Error ? error.message : "Unable to analyze the schedule of activities."
         }`,
       )
     } finally {
+      setRunningScheduleInsightMode(null)
       setLoadingAction(null)
     }
   }
@@ -9227,43 +11257,36 @@ export default function StudySynopsisStudio() {
       setApiError(
         studyMissing.length
           ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
-          : picoMissing.length
-            ? `Complete PICO & Stats first: ${picoMissing.join(", ")}.`
-            : literatureMissing.length
-              ? `Complete Literature first: ${literatureMissing.join(", ")}.`
-              : showScheduleTab
-                ? `Complete Schedule of Activities first: ${scheduleMissing.join(", ")}.`
-                : "Complete the prior tabs first before drafting sections.",
+          : picoBlocking.length
+            ? `Complete PICO & Stats first: ${picoBlocking.join(", ")}.`
+          : workflowOptions.useLiterature && literatureBlocking.length
+            ? `Complete Literature first: ${literatureBlocking.join(", ")}.`
+            : "Complete the prior tabs first before drafting sections.",
       )
       return
     }
 
-    if (literatureMissing.length) {
-      setApiError(`Complete Literature first: ${literatureMissing.join(", ")}.`)
-      return
-    }
-
-    if (showScheduleTab && scheduleMissing.length) {
-      setApiError(`Complete Schedule of Activities first: ${scheduleMissing.join(", ")}.`)
+    if (workflowOptions.useLiterature && literatureBlocking.length) {
+      setApiError(`Complete Literature first: ${literatureBlocking.join(", ")}.`)
       return
     }
 
     const derivedPico = pico.population || pico.intervention || pico.outcomes ? pico : buildPicoFromStudy(study)
     const derivedStats = stats.endpointType ? stats : buildStatsFromStudy(study, derivedPico)
-    const derivedLiterature = literature.pubmedQuery ? literature : buildLiteratureFromState(study, derivedPico)
-    const derivedSchedule =
-      showScheduleTab && schedule.columns.length && schedule.rows.length
-        ? schedule
-        : showScheduleTab
-          ? buildScheduleFromState(study, derivedPico, derivedStats, derivedLiterature, schedule)
-          : undefined
+    const derivedLiterature = workflowOptions.useLiterature
+      ? literature.pubmedQuery
+        ? literature
+        : buildLiteratureFromState(study, derivedPico)
+      : buildSkippedLiteraturePlan(study, derivedPico)
+    const derivedSchedule = showScheduleTab && scheduleReady ? schedule : undefined
+    const studyForGeneration = applySampleSizeGenerationPlan(study, sampleSizeGenerationPlan)
 
     setLoadingAction("sections")
 
     try {
       const result = await callOpenAI<{ sections: Array<{ id: string; title: string; body: string }> }>({
         action: "draft_sections",
-        study,
+        study: studyForGeneration,
         pico: derivedPico,
         stats: derivedStats,
         literature: derivedLiterature,
@@ -9273,10 +11296,10 @@ export default function StudySynopsisStudio() {
 
       const draftedBodyMap = new Map(result.sections.map((section) => [section.id, section]))
 
-      setPico(derivedPico)
-      setStats(derivedStats)
-      setLiterature(derivedLiterature)
-      if (derivedSchedule) setSchedule(derivedSchedule)
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
+      setLiterature({ ...derivedLiterature, sourceFingerprint: studySchemaFingerprint })
+      if (derivedSchedule) setSchedule({ ...derivedSchedule, sourceFingerprint: studySchemaFingerprint })
       setSections((current) =>
         current.map((section) => {
           const drafted = draftedBodyMap.get(section.id)
@@ -9289,10 +11312,11 @@ export default function StudySynopsisStudio() {
                 provenance: "ai_generated",
                 manualEdited: false,
                 lastGeneratedAt: new Date().toISOString(),
+                sourceFingerprint: studySchemaFingerprint,
                 sourceTabs: getSectionSourceTabs(drafted.title || section.title),
                 assumptionFlags: deriveSectionAssumptions(
                   { ...section, title: drafted.title || section.title },
-                  study,
+                  studyForGeneration,
                   derivedPico,
                   derivedStats,
                   derivedLiterature,
@@ -9303,23 +11327,24 @@ export default function StudySynopsisStudio() {
       )
       setActiveTab("sections")
     } catch (error) {
-      setPico(derivedPico)
-      setStats(derivedStats)
-      setLiterature(derivedLiterature)
-      if (derivedSchedule) setSchedule(derivedSchedule)
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
+      setLiterature({ ...derivedLiterature, sourceFingerprint: studySchemaFingerprint })
+      if (derivedSchedule) setSchedule({ ...derivedSchedule, sourceFingerprint: studySchemaFingerprint })
       setSections((current) =>
         current.map((section) => ({
           ...section,
-          body: generateSectionBody(section, study, derivedPico, derivedStats, derivedLiterature, derivedSchedule),
+          body: generateSectionBody(section, studyForGeneration, derivedPico, derivedStats, derivedLiterature, derivedSchedule),
           provenance: "ai_generated",
           manualEdited: false,
           lastGeneratedAt: new Date().toISOString(),
+          sourceFingerprint: studySchemaFingerprint,
           sourceTabs: getSectionSourceTabs(section.title),
-          assumptionFlags: deriveSectionAssumptions(section, study, derivedPico, derivedStats, derivedLiterature),
+          assumptionFlags: deriveSectionAssumptions(section, studyForGeneration, derivedPico, derivedStats, derivedLiterature),
         })),
       )
       setApiNotice(
-        `OpenAI section drafting failed, so the app used local section drafts instead. ${
+        `OpenAI section drafting failed, so the app used local section drafts instead. Review for placeholder assumptions before final assembly. ${
           error instanceof Error ? error.message : "Unable to draft the synopsis sections."
         }`,
       )
@@ -9334,43 +11359,38 @@ export default function StudySynopsisStudio() {
       setApiError(
         studyMissing.length
           ? `Complete the Study Design tab first: ${studyMissing.join(", ")}.`
-          : picoMissing.length
-            ? `Complete PICO & Stats first: ${picoMissing.join(", ")}.`
-            : literatureMissing.length
-              ? `Complete Literature first: ${literatureMissing.join(", ")}.`
-              : showScheduleTab
-                ? `Complete Schedule of Activities first: ${scheduleMissing.join(", ")}.`
-                : "Complete the prior tabs first before generating the final synopsis.",
+          : picoBlocking.length
+            ? `Complete PICO & Stats first: ${picoBlocking.join(", ")}.`
+          : workflowOptions.useLiterature && literatureBlocking.length
+            ? `Complete Literature first: ${literatureBlocking.join(", ")}.`
+            : sectionsStale
+              ? "Refresh or review stale section drafts before generating the final synopsis."
+              : "Complete the prior tabs first before generating the final synopsis.",
       )
       return
     }
 
-    if (literatureMissing.length) {
-      setApiError(`Complete Literature first: ${literatureMissing.join(", ")}.`)
-      return
-    }
-
-    if (showScheduleTab && scheduleMissing.length) {
-      setApiError(`Complete Schedule of Activities first: ${scheduleMissing.join(", ")}.`)
+    if (workflowOptions.useLiterature && literatureBlocking.length) {
+      setApiError(`Complete Literature first: ${literatureBlocking.join(", ")}.`)
       return
     }
 
     const derivedPico = pico.population || pico.intervention || pico.outcomes ? pico : buildPicoFromStudy(study)
     const derivedStats = stats.endpointType ? stats : buildStatsFromStudy(study, derivedPico)
-    const derivedLiterature = literature.pubmedQuery ? literature : buildLiteratureFromState(study, derivedPico)
-    const derivedSchedule =
-      showScheduleTab && schedule.columns.length && schedule.rows.length
-        ? schedule
-        : showScheduleTab
-          ? buildScheduleFromState(study, derivedPico, derivedStats, derivedLiterature, schedule)
-          : undefined
+    const derivedLiterature = workflowOptions.useLiterature
+      ? literature.pubmedQuery
+        ? literature
+        : buildLiteratureFromState(study, derivedPico)
+      : buildSkippedLiteraturePlan(study, derivedPico)
+    const derivedSchedule = showScheduleTab && scheduleReady ? schedule : undefined
+    const studyForGeneration = applySampleSizeGenerationPlan(study, sampleSizeGenerationPlan)
 
     setLoadingAction("final")
 
     try {
       const result = await callOpenAI<{ sections: FinalSection[] }>({
         action: "generate_synopsis",
-        study,
+        study: studyForGeneration,
         pico: derivedPico,
         stats: derivedStats,
         literature: derivedLiterature,
@@ -9380,10 +11400,10 @@ export default function StudySynopsisStudio() {
 
       const finalBodyMap = new Map(result.sections.map((section) => [section.id, section]))
 
-      setPico(derivedPico)
-      setStats(derivedStats)
-      setLiterature(derivedLiterature)
-      if (derivedSchedule) setSchedule(derivedSchedule)
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
+      setLiterature({ ...derivedLiterature, sourceFingerprint: studySchemaFingerprint })
+      if (derivedSchedule) setSchedule({ ...derivedSchedule, sourceFingerprint: studySchemaFingerprint })
       setSections((current) =>
         current.map((section) => {
           const drafted = finalBodyMap.get(section.id)
@@ -9396,10 +11416,11 @@ export default function StudySynopsisStudio() {
                 provenance: "ai_generated",
                 manualEdited: false,
                 lastGeneratedAt: new Date().toISOString(),
+                sourceFingerprint: studySchemaFingerprint,
                 sourceTabs: getSectionSourceTabs(drafted.title || section.title),
                 assumptionFlags: deriveSectionAssumptions(
                   { ...section, title: drafted.title || section.title },
-                  study,
+                  studyForGeneration,
                   derivedPico,
                   derivedStats,
                   derivedLiterature,
@@ -9408,7 +11429,7 @@ export default function StudySynopsisStudio() {
             : section
         }),
       )
-      setFinalSections(result.sections)
+      setFinalSections(result.sections.map((section) => ({ ...section, sourceFingerprint: studySchemaFingerprint })))
       setActiveTab("final")
     } catch (error) {
       const renderedSections = sections
@@ -9416,26 +11437,27 @@ export default function StudySynopsisStudio() {
         .map((section) => ({
           id: section.id,
           title: section.title,
-          body: section.body || generateSectionBody(section, study, derivedPico, derivedStats, derivedLiterature, derivedSchedule),
+          body: section.body || generateSectionBody(section, studyForGeneration, derivedPico, derivedStats, derivedLiterature, derivedSchedule),
         }))
 
-      setPico(derivedPico)
-      setStats(derivedStats)
-      setLiterature(derivedLiterature)
-      if (derivedSchedule) setSchedule(derivedSchedule)
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
+      setLiterature({ ...derivedLiterature, sourceFingerprint: studySchemaFingerprint })
+      if (derivedSchedule) setSchedule({ ...derivedSchedule, sourceFingerprint: studySchemaFingerprint })
       setSections((current) =>
         current.map((section) => ({
           ...section,
-          body: section.body || generateSectionBody(section, study, derivedPico, derivedStats, derivedLiterature, derivedSchedule),
+          body: section.body || generateSectionBody(section, studyForGeneration, derivedPico, derivedStats, derivedLiterature, derivedSchedule),
           provenance: section.body ? section.provenance : "ai_generated",
           lastGeneratedAt: section.lastGeneratedAt || new Date().toISOString(),
+          sourceFingerprint: studySchemaFingerprint,
           sourceTabs: getSectionSourceTabs(section.title),
-          assumptionFlags: deriveSectionAssumptions(section, study, derivedPico, derivedStats, derivedLiterature),
+          assumptionFlags: deriveSectionAssumptions(section, studyForGeneration, derivedPico, derivedStats, derivedLiterature),
         })),
       )
-      setFinalSections(renderedSections)
+      setFinalSections(renderedSections.map((section) => ({ ...section, sourceFingerprint: studySchemaFingerprint })))
       setApiNotice(
-        `OpenAI final synopsis generation failed, so the app used local section drafts instead. ${
+        `OpenAI final synopsis generation failed, so the app used local section drafts instead. Review for placeholder assumptions before export. ${
           error instanceof Error ? error.message : "Unable to generate the final synopsis."
         }`,
       )
@@ -9653,7 +11675,8 @@ export default function StudySynopsisStudio() {
                 (tab.id === "pico" && !gates.pico) ||
                 (tab.id === "literature" && !gates.literature) ||
                 (tab.id === "schedule" && !gates.schedule) ||
-                ((tab.id === "sections" || tab.id === "final") && !gates.sections)
+                (tab.id === "sections" && !gates.sections) ||
+                (tab.id === "final" && !gates.final)
 
               return (
                 <button
@@ -9675,6 +11698,30 @@ export default function StudySynopsisStudio() {
           </div>
         </section>
 
+        <section className="rounded-[24px] border border-white/60 bg-white/70 p-4 shadow-[0_14px_45px_rgba(15,23,42,0.04)]">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Optional workflow modules
+                <InfoTooltip content="Literature is optional. The Schedule of Activities tab appears automatically for eligible prospective study types and can be used or skipped without blocking PICO." />
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => updateWorkflowOption("useLiterature", !workflowOptions.useLiterature)}
+                className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition ${
+                  workflowOptions.useLiterature
+                    ? "border-[#A5D8FF] bg-[#E7F5FF] text-[#1864AB]"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-[#A5D8FF] hover:bg-[#F8FBFF]"
+                }`}
+              >
+                <LibraryBig className="h-4 w-4" />
+                {workflowOptions.useLiterature ? "Literature enabled" : "Add Literature"}
+              </button>
+            </div>
+          </div>
+        </section>
+
         {(apiError || apiNotice || loadingAction) && (
           <div
             className={`px-1 text-xs ${
@@ -9689,6 +11736,41 @@ export default function StudySynopsisStudio() {
           </div>
         )}
 
+        {hasStaleDownstream && (
+          <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-4xl">
+                <p className="font-semibold">Some downstream content may no longer match the current Study Design.</p>
+                <p className="mt-1">
+                  Review or refresh: {staleDownstreamItems.join(", ")}. This prevents final outputs from mixing old objectives,
+                  population, endpoints, or design assumptions with newer Tab 1 inputs.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleExtractPico}
+                  disabled={loadingAction !== null || !gates.pico}
+                  className="rounded-full bg-[#B7791F] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#975A16] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Refresh PICO & stats
+                </button>
+                <button
+                  onClick={handleKeepCurrentDownstream}
+                  className="rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
+                >
+                  Keep after review
+                </button>
+                <button
+                  onClick={handleClearDownstreamDrafts}
+                  className="rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-900 transition hover:bg-amber-100"
+                >
+                  Clear downstream
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === "study" && (
           <section className="space-y-6">
             <div className="rounded-[28px] border border-white/60 bg-white/80 p-6 shadow-[0_22px_70px_rgba(15,23,42,0.06)]">
@@ -9698,10 +11780,6 @@ export default function StudySynopsisStudio() {
                   <h2 className="mt-2 font-[Iowan_Old_Style,Palatino_Linotype,Book_Antiqua,serif] text-3xl text-slate-950">
                     Define the study design
                   </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                    Capture the core study design inputs the downstream tabs depend on: objectives, disease context,
-                    population, intervention or exposure, comparator, endpoints, timing, and operational constraints.
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -9718,12 +11796,6 @@ export default function StudySynopsisStudio() {
                   )}
                 </div>
               </div>
-
-              {openHelpTab === "study" && (
-                <div className="mb-6">
-                  <TabHelpPanel tabId="study" />
-                </div>
-              )}
 
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                 <Field
@@ -9807,11 +11879,11 @@ export default function StudySynopsisStudio() {
               <div className="mt-6 rounded-[24px] border border-sky-200 bg-sky-50 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-900">Study description import</p>
-                    <h3 className="mt-2 text-lg font-semibold text-slate-950">Upload PDF, Word, or PowerPoint and prefill Tab 1</h3>
-                    <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-700">
-                      AI can extract key study details from an existing description deck or document, prepopulate fields, and show what still needs manual input. If the uploaded source clearly conflicts with core study-definition fields already selected in Tab 1, the source now replaces those values and the import report calls it out.
+                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-sky-900">
+                      Study description import
+                      <InfoTooltip content="AI can extract key study details from an existing description deck or document, prepopulate fields, and show what still needs manual input. If the uploaded source conflicts with existing core fields, the source replaces those values and the import report calls it out." />
                     </p>
+                    <h3 className="mt-2 text-lg font-semibold text-slate-950">Upload PDF, Word, or PowerPoint and prefill Tab 1</h3>
                   </div>
 
                   <button
@@ -9826,22 +11898,21 @@ export default function StudySynopsisStudio() {
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-700">Source file</span>
+                    <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                      Source file
+                      <InfoTooltip content="Supported files: .pdf, .docx, and .pptx. Keep files below 12 MB." />
+                    </span>
                     <input
                       type="file"
                       accept=".pdf,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                       onChange={(event) => setStudyDocumentFile(event.target.files?.[0] || null)}
                       className="block w-full rounded-2xl border border-white/70 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm file:mr-4 file:rounded-full file:border-0 file:bg-sky-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#1864AB]"
                     />
-                    <p className="text-xs leading-6 text-slate-500">Supported: `.pdf`, `.docx`, `.pptx`. Keep files below 12 MB.</p>
                   </label>
 
                   <div className="rounded-[20px] border border-white/70 bg-white/80 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Current selection</p>
                     <p className="mt-2 text-sm font-semibold text-slate-900">{studyDocumentFile?.name || "No file selected"}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Best for: study synopsis drafts, protocol summary decks, clinical study concept notes, or executive-stage study descriptions.
-                    </p>
                   </div>
                 </div>
 
@@ -9957,11 +12028,11 @@ export default function StudySynopsisStudio() {
               <div className="mt-6 rounded-[26px] border border-amber-200 bg-amber-50 p-5">
                 <div className="flex flex-wrap items-start gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-800">Strategic framing</p>
-                    <h3 className="mt-2 text-xl font-semibold text-amber-950">Primary study aim, therapeutic area, disease, and endpoints</h3>
-                    <p className="mt-2 max-w-2xl text-sm leading-7 text-amber-950">
-                      Start with one high-level answer to what this study is mainly trying to achieve, then narrow to therapeutic area and disease. The disease drives a suggested endpoint list, but users can still add custom disease labels and custom endpoints.
+                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-800">
+                      Strategic framing
+                      <InfoTooltip content="Start with one high-level answer to what this study is mainly trying to achieve, then narrow to therapeutic area and disease. The disease can seed endpoint options, but users can still add custom disease labels and endpoints." />
                     </p>
+                    <h3 className="mt-2 text-xl font-semibold text-amber-950">Primary study aim, therapeutic area, disease, and endpoints</h3>
                   </div>
                 </div>
 
@@ -10001,11 +12072,91 @@ export default function StudySynopsisStudio() {
                   </div>
                 )}
 
+                <div className="mt-5 rounded-[24px] border border-sky-200 bg-white/80 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Protocol guardrails
+                        <InfoTooltip content="Advisory checks for objective count, endpoint focus, duration, comparator discipline, and data-collection burden. They do not block the workflow." />
+                      </p>
+                      <h4 className="mt-2 text-base font-semibold text-slate-950">
+                        {resolvedProtocolGuardrailProfile === "none"
+                          ? "No additional protocol discipline active"
+                          : PROTOCOL_GUARDRAIL_LABELS[resolvedProtocolGuardrailProfile]}
+                      </h4>
+                      {study.protocolGuardrailProfile === "auto" && suggestedProtocolGuardrailProfile !== "none" ? (
+                        <p className="mt-2 text-xs font-semibold text-[#1864AB]">
+                          Auto-suggested from the current study type and primary aim: {PROTOCOL_GUARDRAIL_LABELS[suggestedProtocolGuardrailProfile]}.
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      onClick={() => setOpenProtocolGuardrailModal(true)}
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                        protocolGuardrailNeedsAttention
+                          ? "border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                          : "border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                      }`}
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Check guardrails
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-slate-700">Guardrail profile</span>
+                      <select
+                        value={study.protocolGuardrailProfile}
+                        onChange={(event) =>
+                          updateStudy("protocolGuardrailProfile", event.target.value as ProtocolGuardrailProfile)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1864AB] focus:ring-2 focus:ring-sky-100"
+                      >
+                        {PROTOCOL_GUARDRAIL_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    {resolvedProtocolGuardrailProfile === "practice_informing_ped" ? (
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-slate-700">Phase 3 safety data available?</span>
+                        <select
+                          value={study.phase3SafetyDataAvailable}
+                          onChange={(event) =>
+                            updateStudy("phase3SafetyDataAvailable", event.target.value as Phase3SafetyAvailability)
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1864AB] focus:ring-2 focus:ring-sky-100"
+                        >
+                          <option value="">Not confirmed</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                          <option value="unknown">Unknown</option>
+                        </select>
+                      </label>
+                    ) : (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Applied to AI suggestions</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {resolvedProtocolGuardrailProfile === "none"
+                            ? "AI uses standard study-synopsis drafting rules."
+                            : "AI will favor lean objectives, focused endpoints, and minimized data collection."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <details className="mt-5 rounded-[24px] border border-slate-200 bg-white/70 p-5">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-900">Optional refinements</summary>
-                  <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                    Use this only if the study has meaningful secondary goals or additional evidence destinations beyond the primary aim.
-                  </p>
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+                    <span className="inline-flex items-center gap-2">
+                      Optional refinements
+                      <InfoTooltip content="Use this only if the study has meaningful secondary goals or additional evidence destinations beyond the primary aim." />
+                    </span>
+                  </summary>
 
                   <div className="mt-4">
                     <p className="text-sm font-medium text-slate-700">Secondary program goals</p>
@@ -10109,7 +12260,6 @@ export default function StudySynopsisStudio() {
                           ))}
                           <option value="__custom__">Custom...</option>
                         </select>
-                        <p className="text-xs leading-6 text-slate-500">This guided list helps tailor downstream AI suggestions and synopsis wording.</p>
                       </>
                     )}
                   </label>
@@ -10146,11 +12296,11 @@ export default function StudySynopsisStudio() {
 
               <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                 <div className="mb-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Research objective</p>
-                  <h3 className="mt-2 text-lg font-semibold text-slate-950">What the study will actually test</h3>
-                  <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                    This is where the program and evidence intent turn into the actual scientific question, design framing, and endpoint-facing study narrative. Use the AI actions directly on the fields that need help rather than working through a separate proposal block.
+                  <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Research objective
+                    <InfoTooltip content="This is where the program and evidence intent turn into the actual scientific question, design framing, and endpoint-facing study narrative. Use the AI actions directly on the fields that need help rather than working through a separate proposal block." />
                   </p>
+                  <h3 className="mt-2 text-lg font-semibold text-slate-950">What the study will actually test</h3>
                 </div>
 
                 <div className="grid gap-5">
@@ -10339,12 +12489,14 @@ export default function StudySynopsisStudio() {
                   value={study.intervention || study.topIntervention}
                   onChange={(value) => updateStudy("intervention", value)}
                   placeholder="XYZ 200 mg IV every 3 weeks until progression or unacceptable toxicity."
+                  rows={3}
                 />
                 <TextAreaField
                   label="Comparator"
                   value={study.comparator || study.topComparator}
                   onChange={(value) => updateStudy("comparator", value)}
                   placeholder="Investigator's choice of docetaxel or pemetrexed standard of care."
+                  rows={3}
                 />
                 <TextAreaField
                   label="Endpoints and assessments"
@@ -10455,9 +12607,9 @@ export default function StudySynopsisStudio() {
                 />
                 {isEvidenceSynthesisStudy ? (
                   <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-sm font-medium text-slate-700">Sample size planning input</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Not typically applicable for evidence synthesis. Use Literature planning to define evidence scope, inclusion criteria, and expected body of evidence instead.
+                    <p className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                      Sample size planning input
+                      <InfoTooltip content="Not typically applicable for evidence synthesis. Use Literature planning to define evidence scope, inclusion criteria, and expected body of evidence instead." />
                     </p>
                   </div>
                 ) : (
@@ -10473,30 +12625,44 @@ export default function StudySynopsisStudio() {
               <div className="mt-6 rounded-[26px] border border-slate-200 bg-slate-50 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">AI evidence impact</p>
-                    <h3 className="mt-2 text-xl font-semibold text-slate-950">Early view of likely study impact</h3>
-                    <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                      Use this at the end of Tab 1 to pressure-test the current concept before you move on. The assessment estimates whether the study is currently stronger for publication, practice, HTA, guideline, or label-relevant impact.
+                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      AI evidence impact
+                      <InfoTooltip content="Use this at the end of Tab 1 to pressure-test the current concept. The assessment estimates whether the study is currently stronger for publication, practice, HTA, guideline, or label-relevant impact." />
                     </p>
+                    <h3 className="mt-2 text-xl font-semibold text-slate-950">Early view of likely study impact</h3>
                   </div>
 
                   <button
                     onClick={handleAssessImpact}
                     disabled={loadingAction !== null || !impactAssessmentReady}
+                    title={impactAssessmentReady ? "Assess likely study impact" : `Needs: ${impactAssessmentMissing.join(", ")}`}
                     className="inline-flex items-center gap-2 rounded-full bg-[#1864AB] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#155799] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <BarChart3 className="h-4 w-4" />
-                    {loadingAction === "impact" ? "Assessing..." : impactAssessment.generatedAt ? "Refresh impact view" : "Assess study impact"}
+                    {impactAssessmentButtonLabel}
                   </button>
                 </div>
 
                 <p className={`mt-3 text-xs ${impactAssessmentReady ? "text-emerald-700" : "text-slate-500"}`}>
-                  {impactAssessmentReady ? "Ready to assess." : `Needs: ${impactAssessmentMissing.join(", ")}.`}
+                  {impactAssessmentReady
+                    ? "Ready to assess. Comparator, endpoints, timeline, geography, and sample size improve the assessment but do not block it."
+                    : `Needs only essential concept inputs: ${impactAssessmentMissing.join(", ")}.`}
                 </p>
 
-                <div className="mt-5">
-                  <ImpactAssessmentPanel assessment={impactAssessment} />
-                </div>
+                {impactAssessment.generatedAt ? (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-white bg-white px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Last assessment available</p>
+                      <p className="mt-1 text-xs text-slate-500">{formatTimestamp(impactAssessment.generatedAt)}</p>
+                    </div>
+                    <button
+                      onClick={() => setOpenImpactAssessmentModal(true)}
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800"
+                    >
+                      View assessment
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               {showReviewGates && (
@@ -10525,7 +12691,7 @@ export default function StudySynopsisStudio() {
               <div className="mt-8 flex flex-wrap gap-3">
                 <button
                   onClick={handleExtractPico}
-                  disabled={loadingAction !== null || !studyReady}
+                  disabled={loadingAction !== null || !gates.pico}
                   className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Sparkles className="h-4 w-4" />
@@ -10553,9 +12719,6 @@ export default function StudySynopsisStudio() {
                   <h2 className="mt-2 font-[Iowan_Old_Style,Palatino_Linotype,Book_Antiqua,serif] text-3xl text-slate-950">
                     Build an optional study schema
                   </h2>
-                  <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-                    Turn the current study concept into an editable visual schema. This tab is optional and does not block the workflow, but it is useful for pressure-testing whether the design reads clearly before moving into PICO, literature, and drafting.
-                  </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -10572,12 +12735,6 @@ export default function StudySynopsisStudio() {
                   )}
                 </div>
               </div>
-
-              {openHelpTab === "schema" && (
-                <div className="mb-6">
-                  <TabHelpPanel tabId="schema" />
-                </div>
-              )}
 
               {studySchemaStale && (
                 <div className="mb-5 rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
@@ -10609,9 +12766,74 @@ export default function StudySynopsisStudio() {
                     </label>
                   </div>
 
-                  <p className="mt-3 text-xs text-slate-500">
-                    The presentation schema is fixed to a horizontal one-slide layout so it stays readable in PowerPoint-style outputs.
-                  </p>
+                  <div className="mt-5 grid gap-4 md:grid-cols-[0.45fr_0.55fr]">
+                    <label className="space-y-2">
+                      <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                        Schema use case
+                        <InfoTooltip content="Changing this applies a recommended content preset for the intended export audience." />
+                      </span>
+                      <select
+                        value={studySchema.useCase}
+                        onChange={(event) => handleStudySchemaUseCaseChange(event.target.value as StudySchemaUseCase)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#F2B8BC] focus:ring-2 focus:ring-[#FDECEC]"
+                      >
+                        <option value="executive_slide">Executive slide</option>
+                        <option value="protocol_overview">Protocol overview</option>
+                        <option value="internal_review">Internal review</option>
+                      </select>
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                        Design pattern
+                        <InfoTooltip content="Use Auto for standard studies. Select a specific pattern for platform, adaptive, cross-over, or substudy-enabled designs so the schema uses the right visual logic." />
+                      </span>
+                      <select
+                        value={studySchema.designPattern}
+                        onChange={(event) => updateStudySchemaMeta("designPattern", event.target.value as StudySchemaDesignPattern)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#F2B8BC] focus:ring-2 focus:ring-[#FDECEC]"
+                      >
+                        {STUDY_SCHEMA_PATTERN_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="mt-4 rounded-[20px] border border-[#F2B8BC] bg-white px-4 py-3 text-sm leading-6 text-slate-700">
+                    <span className="font-semibold text-slate-950">Schema pattern in use: </span>
+                    {getStudySchemaPatternOption(getResolvedStudySchemaDesignPattern(study, studySchema)).label}.{" "}
+                    {getStudySchemaPatternOption(getResolvedStudySchemaDesignPattern(study, studySchema)).description}
+                  </div>
+
+                  <div className="mt-5 grid gap-4 md:grid-cols-[0.45fr_0.55fr]">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">Include in export</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {STUDY_SCHEMA_CONTENT_OPTIONS.map((option) => (
+                          <label
+                            key={option.id}
+                            title={option.description}
+                            className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                              studySchema.contentBlocks.includes(option.id)
+                                ? "border-[#F2B8BC] bg-white text-[#B81219]"
+                                : "border-slate-200 bg-white/70 text-slate-600 hover:border-[#F2B8BC]"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={studySchema.contentBlocks.includes(option.id)}
+                              onChange={() => toggleStudySchemaContentBlock(option.id)}
+                              className="h-3.5 w-3.5 rounded border-slate-300 text-[#D71920] focus:ring-[#D71920]"
+                            />
+                            {option.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="mt-5">
                     <label className="space-y-2">
@@ -10630,7 +12852,7 @@ export default function StudySynopsisStudio() {
                     <button
                       onClick={handleGenerateStudySchema}
                       disabled={loadingAction !== null || !studySchemaReady}
-                      className="inline-flex items-center gap-2 rounded-full bg-[#1864AB] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#155799] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-full bg-[#D71920] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#B81219] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <GitBranch className="h-4 w-4" />
                       {loadingAction === "schema"
@@ -10655,6 +12877,14 @@ export default function StudySynopsisStudio() {
                       <FileDown className="h-4 w-4" />
                       Export PNG
                     </button>
+                    <button
+                      onClick={() => handleExportStudySchema("pptx")}
+                      disabled={!studySchemaGenerated}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#F2B8BC] bg-white px-5 py-3 text-sm font-semibold text-[#B81219] transition hover:bg-[#FFF1F2] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Export editable PPT
+                    </button>
                   </div>
 
                   <p className={`mt-3 text-xs ${studySchemaReady ? "text-emerald-700" : "text-slate-500"}`}>
@@ -10666,15 +12896,14 @@ export default function StudySynopsisStudio() {
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Schema inputs</p>
                   <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
                     <p>Study type: <span className="font-semibold text-slate-950">{study.subcategory || study.category || "Not set"}</span></p>
+                    <p>Schema pattern: <span className="font-semibold text-slate-950">{getStudySchemaPatternOption(getResolvedStudySchemaDesignPattern(study, studySchema)).label}</span></p>
                     <p>Disease: <span className="font-semibold text-slate-950">{getSelectedDiseaseLabel(study) || getResolvedIndication(study) || "Not set"}</span></p>
                     <p>Intervention: <span className="font-semibold text-slate-950">{study.topIntervention || study.intervention || "Not set"}</span></p>
                     <p>Comparator: <span className="font-semibold text-slate-950">{study.topComparator || study.comparator || "Not set"}</span></p>
                     <p>Decision destination: <span className="font-semibold text-slate-950">{getPrimaryEvidenceUseIntent(study) || "Not set"}</span></p>
                     <p>Objective: <span className="font-semibold text-slate-950">{study.primaryObjective || "Not set"}</span></p>
+                    <p>Export content: <span className="font-semibold text-slate-950">{studySchema.contentBlocks.length} selected blocks</span></p>
                   </div>
-                  <p className="mt-4 text-sm leading-6 text-slate-500">
-                    This view now uses a fixed presentation template so the schema stays readable on one page or one slide. Change the study content in Tab 1 to change the schema wording.
-                  </p>
                 </div>
               </div>
 
@@ -10685,14 +12914,17 @@ export default function StudySynopsisStudio() {
               <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Appearance</p>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                      This schema now uses a fixed visual template instead of free node placement. You can still adjust the palette, but the content structure stays slide-friendly by design.
+                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      Appearance
+                      <InfoTooltip content="New schemas generate with a J&J-style red, white, and neutral-gray palette. You can still adjust colors after generation without changing the slide-friendly structure." />
                     </p>
                   </div>
-                  <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-                    Edit study wording in Tab 1 to change step titles, arms, cohorts, objectives, and endpoints.
-                  </div>
+                  <button
+                    onClick={applyJAndJStudySchemaPalette}
+                    className="rounded-full border border-[#F2B8BC] bg-white px-4 py-3 text-sm font-semibold text-[#B81219] transition hover:bg-[#FFF1F2]"
+                  >
+                    Use J&J palette
+                  </button>
                 </div>
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -10723,7 +12955,7 @@ export default function StudySynopsisStudio() {
               <div className="mt-8 flex flex-wrap gap-3">
                 <button
                   onClick={handleExtractPico}
-                  disabled={loadingAction !== null || !studyReady}
+                  disabled={loadingAction !== null || !gates.pico}
                   className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Sparkles className="h-4 w-4" />
@@ -10750,10 +12982,6 @@ export default function StudySynopsisStudio() {
                   <h2 className="mt-2 font-[Iowan_Old_Style,Palatino_Linotype,Book_Antiqua,serif] text-3xl text-slate-950">
                     Extract PICO and draft statistical assumptions
                   </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                    This tab pulls structured PICO content from Tab 1 and frames the first-pass statistical assumptions
-                    needed for synopsis drafting. The prompts below are ready to hand to a GenAI model for refinement.
-                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -10764,7 +12992,7 @@ export default function StudySynopsisStudio() {
                   />
                   <button
                     onClick={handleExtractPico}
-                    disabled={loadingAction !== null || !studyReady}
+                    disabled={loadingAction !== null || !gates.pico}
                     className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Sparkles className="h-4 w-4" />
@@ -10772,12 +13000,6 @@ export default function StudySynopsisStudio() {
                   </button>
                 </div>
               </div>
-
-              {openHelpTab === "pico" && (
-                <div className="mb-6">
-                  <TabHelpPanel tabId="pico" />
-                </div>
-              )}
 
               <div className="grid gap-5 md:grid-cols-2">
                 <TextAreaField
@@ -10816,7 +13038,10 @@ export default function StudySynopsisStudio() {
               </div>
 
               <div className="mt-6 rounded-[24px] border border-[#D0EBFF] bg-[#E7F5FF] p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1864AB]">GenAI prompt for PICO extraction</p>
+                <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#1864AB]">
+                  GenAI prompt for PICO extraction
+                  <InfoTooltip content="Optional prompt text for later refinement of the PICO extraction." />
+                </p>
                 <textarea
                   value={pico.prompt}
                   onChange={(event) => updatePico("prompt", event.target.value)}
@@ -10852,13 +13077,17 @@ export default function StudySynopsisStudio() {
             <div className="rounded-[28px] border border-[#D0EBFF] bg-[#F8FBFF] p-6 shadow-[0_22px_70px_rgba(15,23,42,0.06)]">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#1864AB]">Biostatistics starter</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-950">Draft assumptions</h3>
-                  <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                    {isEvidenceSynthesisStudy
-                      ? "Use this area only if the evidence synthesis needs explicit analytic assumptions. Patient sample-size estimation does not apply here."
-                      : "Edit the current statistical assumptions in one structured field. Keep the bracket headings in place so the estimator can continue using the right inputs."}
+                  <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-[#1864AB]">
+                    Biostatistics starter
+                    <InfoTooltip
+                      content={
+                        isEvidenceSynthesisStudy
+                          ? "Use this area only if the evidence synthesis needs explicit analytic assumptions. Patient sample-size estimation does not apply here."
+                          : "Edit the current statistical assumptions in one structured field. Keep bracket headings in place so the estimator can use the right inputs."
+                      }
+                    />
                   </p>
+                  <h3 className="mt-2 text-2xl font-semibold text-slate-950">Draft assumptions</h3>
                 </div>
                 {picoReady && (
                   <div className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
@@ -10869,18 +13098,22 @@ export default function StudySynopsisStudio() {
 
               <div className="mt-5">
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-700">Statistical assumptions</span>
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                    Statistical assumptions
+                    <InfoTooltip
+                      content={
+                        isEvidenceSynthesisStudy
+                          ? "Use bracket headings as section labels. Keep only analytic assumptions relevant for the synthesis."
+                          : "Use bracket headings as section labels. The sample-size estimator reads values from this editor."
+                      }
+                    />
+                  </span>
                   <textarea
                     value={buildStatsEditorText(stats)}
                     onChange={(event) => handleStatsEditorChange(event.target.value)}
                     rows={22}
                     className="w-full rounded-[22px] border border-[#D0EBFF] bg-white px-4 py-4 text-sm leading-7 text-slate-800 outline-none transition focus:border-[#74C0FC] focus:ring-2 focus:ring-[#A5D8FF]"
                   />
-                  <p className="text-xs leading-6 text-slate-500">
-                    {isEvidenceSynthesisStudy
-                      ? "Use the bracket headings as section labels. Keep only the analytic assumptions that are relevant for the synthesis."
-                      : "Use the bracket headings as section labels. The sample-size estimator reads the values from this editor."}
-                  </p>
                 </label>
               </div>
 
@@ -10888,11 +13121,11 @@ export default function StudySynopsisStudio() {
                 <div className="mt-6 rounded-[24px] border border-[#D0EBFF] bg-white p-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1864AB]">AI-assisted sample size estimate</p>
-                      <h4 className="mt-2 text-lg font-semibold text-slate-950">Estimate required sample size from the current assumptions</h4>
-                      <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                        This uses deterministic formulas under the current statistical assumptions. If a planned sample size was entered in Study Design, the estimate compares against it.
+                      <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#1864AB]">
+                        Sample size planning estimate
+                        <InfoTooltip content="AI can help draft assumptions, but the numeric estimate uses deterministic formulas. Complex designs still require biostatistics confirmation before protocol sign-off." />
                       </p>
+                      <h4 className="mt-2 text-lg font-semibold text-slate-950">Estimate required sample size from the current assumptions</h4>
                     </div>
 
                     <button
@@ -10912,6 +13145,26 @@ export default function StudySynopsisStudio() {
                     </span>
                   </div>
 
+                  <div
+                    className={`mt-4 rounded-[18px] border px-4 py-3 text-sm leading-6 ${
+                      sampleSizeGenerationPlan.needsAttention
+                        ? "border-amber-200 bg-amber-50 text-amber-950"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-950"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p>{sampleSizeGenerationPlan.summary}</p>
+                      {sampleSizeEstimate.status === "ready" && buildCalculatedSampleSizeText(sampleSizeEstimate) ? (
+                        <button
+                          onClick={() => updateStudy("sampleSize", buildCalculatedSampleSizeText(sampleSizeEstimate))}
+                          className="rounded-full border border-white/70 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-[#A5D8FF] hover:bg-[#F8FBFF]"
+                        >
+                          Save estimate to Tab 1
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
                   {sampleSizeEstimate.status !== "idle" && (
                     <div
                       className={`mt-5 rounded-[20px] border p-4 ${
@@ -10922,27 +13175,53 @@ export default function StudySynopsisStudio() {
                             : "border-rose-200 bg-rose-50"
                       }`}
                     >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-950">
-                          {sampleSizeEstimate.methodLabel || "Sample-size estimation"}
-                        </p>
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">{sampleSizeEstimate.summary}</p>
-                      </div>
-                      {sampleSizeEstimate.generatedAt ? (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                          {formatTimestamp(sampleSizeEstimate.generatedAt)}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    {sampleSizeEstimate.status === "ready" && (
-                      <>
-                        <div className="mt-4 grid gap-3 md:grid-cols-4">
-                          <div className="rounded-[18px] bg-[#F1F8FF] p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Per arm</p>
-                            <p className="mt-2 text-2xl font-semibold text-slate-950">{sampleSizeEstimate.estimatedPerArm.toLocaleString()}</p>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-slate-950">
+                              {sampleSizeEstimate.methodLabel || "Sample-size estimation"}
+                            </p>
+                            {sampleSizeEstimate.reliabilityLabel ? (
+                              <span
+                                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                  sampleSizeEstimate.reliabilityLabel.includes("review")
+                                    ? "bg-amber-100 text-amber-800"
+                                    : sampleSizeEstimate.reliabilityLabel.includes("Directional")
+                                      ? "bg-sky-100 text-sky-800"
+                                      : "bg-emerald-100 text-emerald-800"
+                                }`}
+                              >
+                                {sampleSizeEstimate.reliabilityLabel}
+                              </span>
+                            ) : null}
                           </div>
+                          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">{sampleSizeEstimate.summary}</p>
+                        </div>
+                        {sampleSizeEstimate.generatedAt ? (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            {formatTimestamp(sampleSizeEstimate.generatedAt)}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {sampleSizeEstimate.status === "ready" && (
+                        <>
+                          <div className="mt-4 grid gap-3 md:grid-cols-4">
+                            <div className="rounded-[18px] bg-[#F1F8FF] p-4">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                {sampleSizeEstimate.allocationRatio === 1 ? "Per arm" : "Arm split"}
+                              </p>
+                              <p className="mt-2 text-2xl font-semibold text-slate-950">
+                                {sampleSizeEstimate.allocationRatio === 1
+                                  ? sampleSizeEstimate.estimatedPerArm.toLocaleString()
+                                  : `${sampleSizeEstimate.estimatedTreatmentArm.toLocaleString()} / ${sampleSizeEstimate.estimatedControlArm.toLocaleString()}`}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {sampleSizeEstimate.allocationRatio === 1
+                                  ? "Equal allocation"
+                                  : `Treatment / control, ${sampleSizeEstimate.allocationRatio.toFixed(2)}:1`}
+                              </p>
+                            </div>
                           <div className="rounded-[18px] bg-[#F1F8FF] p-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Total</p>
                             <p className="mt-2 text-2xl font-semibold text-slate-950">{sampleSizeEstimate.estimatedTotal.toLocaleString()}</p>
@@ -10984,6 +13263,24 @@ export default function StudySynopsisStudio() {
                         <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
                           <div className="rounded-[18px] bg-[#F1F8FF] p-4">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Assumptions used</p>
+                            {sampleSizeEstimate.formula ? (
+                              <div className="mt-3 rounded-2xl bg-white p-3 shadow-sm">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Formula</p>
+                                <p className="mt-2 text-sm leading-6 text-slate-700">{sampleSizeEstimate.formula}</p>
+                              </div>
+                            ) : null}
+                            {sampleSizeEstimate.warnings.length > 0 && (
+                              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">Reliability warnings</p>
+                                <div className="mt-2 space-y-2">
+                                  {sampleSizeEstimate.warnings.map((warning) => (
+                                    <p key={warning} className="text-sm leading-6 text-amber-900">
+                                      {warning}
+                                    </p>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             <div className="mt-3 flex flex-wrap gap-2">
                               {sampleSizeEstimate.assumptions.map((item) => (
                                 <span key={item} className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm">
@@ -10991,6 +13288,16 @@ export default function StudySynopsisStudio() {
                                 </span>
                               ))}
                             </div>
+                            {sampleSizeEstimate.auditTrail.length > 0 && (
+                              <div className="mt-4 space-y-2">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Calculation trace</p>
+                                {sampleSizeEstimate.auditTrail.map((item) => (
+                                  <p key={item} className="text-sm leading-6 text-slate-600">
+                                    {item}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
                             {sampleSizeEstimate.notes.length > 0 && (
                               <div className="mt-4 space-y-2">
                                 {sampleSizeEstimate.notes.map((note) => (
@@ -11034,9 +13341,6 @@ export default function StudySynopsisStudio() {
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div>
                                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1864AB]">Draft fill-ins for missing assumptions</p>
-                                <p className="mt-2 text-sm leading-6 text-slate-600">
-                                  Use these drafts to unblock the estimator, then adjust them in the statistical assumptions editor if needed.
-                                </p>
                               </div>
                               {sampleSizeSuggestions.length > 1 && (
                                 <button
@@ -11078,9 +13382,6 @@ export default function StudySynopsisStudio() {
                 <div className="mt-6 rounded-[24px] border border-[#D0EBFF] bg-white p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1864AB]">Evidence synthesis note</p>
                   <h4 className="mt-2 text-lg font-semibold text-slate-950">Sample-size estimation is not used here</h4>
-                  <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                    For evidence synthesis, focus on evidence scope, inclusion logic, comparability, and analytic method. Patient sample-size planning does not usually apply in this workflow.
-                  </p>
                 </div>
               )}
 
@@ -11097,10 +13398,6 @@ export default function StudySynopsisStudio() {
                   <h2 className="mt-2 font-[Iowan_Old_Style,Palatino_Linotype,Book_Antiqua,serif] text-3xl text-slate-950">
                     Conduct the literature planning step
                   </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                    Use structured PICO inputs to define search sources, inclusion logic, search strings, and the
-                    background themes that should inform the synopsis rationale section.
-                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -11119,12 +13416,6 @@ export default function StudySynopsisStudio() {
                   </button>
                 </div>
               </div>
-
-              {openHelpTab === "literature" && (
-                <div className="mb-6">
-                  <TabHelpPanel tabId="literature" />
-                </div>
-              )}
 
               <div className="grid gap-5">
                 <TextAreaField
@@ -11249,11 +13540,6 @@ export default function StudySynopsisStudio() {
                   <h2 className="mt-2 font-[Iowan_Old_Style,Palatino_Linotype,Book_Antiqua,serif] text-3xl text-slate-950">
                     Draft the schedule of activities
                   </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                    For interventional studies, this tab generates a hierarchical schedule-of-activities table with
-                    three header tiers: study phase, period, and visit. You can edit cells directly, regroup rows,
-                    and ask AI to regenerate against a more specific instruction.
-                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -11279,7 +13565,14 @@ export default function StudySynopsisStudio() {
                     Add visit column
                   </button>
                   <button
-                    onClick={handleGenerateSchedule}
+                    onClick={() => {
+                      if (schedule.rows.length) {
+                        setOpenScheduleRegenerationModal(true)
+                        return
+                      }
+
+                      handleGenerateSchedule()
+                    }}
                     disabled={loadingAction !== null || !gates.schedule}
                     className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -11296,7 +13589,7 @@ export default function StudySynopsisStudio() {
                     className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <BarChart3 className="h-4 w-4" />
-                    {loadingAction === "schedule_analysis" ? "Analyzing..." : "Assess complexity"}
+                    {runningScheduleInsightMode === "complexity" ? "Assessing complexity..." : "Assess complexity"}
                   </button>
                   <button
                     onClick={() => handleAnalyzeScheduleInsights("tradeoff")}
@@ -11304,50 +13597,58 @@ export default function StudySynopsisStudio() {
                     className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Scale className="h-4 w-4" />
-                    {loadingAction === "schedule_analysis" ? "Analyzing..." : "Check trade-off analysis"}
+                    {runningScheduleInsightMode === "tradeoff" ? "Checking trade-offs..." : "Check trade-off analysis"}
                   </button>
                 </div>
               </div>
 
-              {openHelpTab === "schedule" && (
-                <div className="mb-6">
-                  <TabHelpPanel tabId="schedule" />
+              <div className="mt-5 rounded-[24px] border border-sky-200 bg-sky-50 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1864AB]">
+                      SoA structure
+                      <InfoTooltip content="Keep this on Auto unless the study has different drugs, dosing schedules, cohorts, regions, or substudies. The app will still generate one editable SoA view." />
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold text-slate-950">Choose how arm, cohort, or dosing differences should appear</h3>
+                  </div>
+                  <span className="rounded-full border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-[#1864AB]">
+                    Using: {resolvedScheduleStructureOption.label}
+                  </span>
                 </div>
-              )}
 
-              <div className="grid gap-5 md:grid-cols-[0.95fr_1.05fr]">
-                <TextAreaField
-                  label="Schedule purpose and legend"
-                  value={schedule.purpose}
-                  onChange={(value) => updateScheduleMeta("purpose", value)}
-                  placeholder='Explain the schedule intent and legend, for example: "X = required, blank = not required."'
-                  rows={4}
-                />
-                <TextAreaField
-                  label={schedule.rows.length ? "What should be different in the regenerated schedule?" : "Optional instruction for the first draft"}
-                  value={schedule.iterationPrompt}
-                  onChange={(value) => updateScheduleMeta("iterationPrompt", value)}
-                  placeholder={
-                    schedule.rows.length
-                      ? "Example: make Cycle 1 more intensive, add ophthalmology monitoring, or simplify follow-up."
-                      : "Example: keep the table simple, add a survival follow-up period, or include PK sampling."
-                  }
-                  rows={4}
-                />
-              </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-5">
+                  {SCHEDULE_STRUCTURE_OPTIONS.map((option) => {
+                    const selected = schedule.structureMode === option.value
 
-              <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                {schedule.rows.length
-                  ? "Type what should change, then use “Regenerate with change request”."
-                  : "You can tell AI how the first schedule should differ before generating it."}
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => updateScheduleMeta("structureMode", option.value)}
+                        className={`rounded-[18px] border px-3 py-3 text-left transition ${
+                          selected
+                            ? "border-[#1864AB] bg-white text-slate-950 shadow-sm"
+                            : "border-sky-100 bg-white/60 text-slate-600 hover:border-sky-300 hover:bg-white"
+                        }`}
+                        title={option.description}
+                      >
+                        <span className="inline-flex items-center gap-2 text-sm font-semibold">
+                          {option.label}
+                          <InfoTooltip content={option.description} label={`${option.label} guidance`} />
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Table layout</p>
+                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Table layout
+                      <InfoTooltip content={scheduleTablePresentation.recommendation} />
+                    </p>
                     <h3 className="mt-2 text-lg font-semibold text-slate-950">Single table by default, split only when it helps readability</h3>
-                    <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">{scheduleTablePresentation.recommendation}</p>
                   </div>
 
                   <div className="inline-flex rounded-full border border-slate-200 bg-white p-1">
@@ -11413,27 +13714,27 @@ export default function StudySynopsisStudio() {
               <div className="mt-6 rounded-[26px] border border-slate-200 bg-slate-50 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Operational diagnostics</p>
-                    <h3 className="mt-2 text-2xl font-semibold text-slate-950">Complexity and reduction analysis</h3>
-                    <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-                      Assess study burden and identify which visits or assessments may be simplified without weakening the objective,
-                      endpoint package, or required safety capture.
+                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Operational diagnostics
+                      <InfoTooltip content="Use the buttons above when you need a focused review. Results open in a pop-up so the SoA editor stays uncluttered." />
                     </p>
+                    <h3 className="mt-2 text-2xl font-semibold text-slate-950">Complexity and reduction analysis</h3>
                   </div>
 
                   {scheduleInsightsReady && (
-                    <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-right text-xs text-slate-500">
-                      <p className="font-semibold text-slate-700">
-                        {scheduleInsights.provenance === "ai_generated" ? "AI analysis" : "Local fallback analysis"}
-                      </p>
-                      <p className="mt-1">Updated {formatTimestamp(scheduleInsights.generatedAt)}</p>
-                    </div>
+                    <button
+                      onClick={() => setOpenScheduleInsightsModal(true)}
+                      className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50"
+                    >
+                      View last analysis
+                    </button>
                   )}
                 </div>
-
-                <div className="mt-5">
-                  <ScheduleInsightsPanel insights={scheduleInsights} />
-                </div>
+                <p className="mt-4 text-xs leading-5 text-slate-500">
+                  {scheduleInsightsReady
+                    ? `${scheduleInsights.mode === "tradeoff" ? "Trade-off analysis" : "Complexity assessment"} updated ${formatTimestamp(scheduleInsights.generatedAt)}.`
+                    : "No analysis has been run yet. Generate or edit the SoA first, then assess complexity or trade-offs."}
+                </p>
               </div>
             </div>
           </section>
@@ -11448,10 +13749,6 @@ export default function StudySynopsisStudio() {
                   <h2 className="mt-2 font-[Iowan_Old_Style,Palatino_Linotype,Book_Antiqua,serif] text-3xl text-slate-950">
                     Configure the section list and prompts
                   </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                    This tab gives you the generated section backbone: reorder sections, remove sections, add new
-                    sections, and tailor the prompt behind each generated narrative block before final assembly.
-                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -11478,12 +13775,6 @@ export default function StudySynopsisStudio() {
                   </button>
                 </div>
               </div>
-
-              {openHelpTab === "sections" && (
-                <div className="mb-6">
-                  <TabHelpPanel tabId="sections" />
-                </div>
-              )}
 
               <div className="space-y-4">
                 {sections.map((section, index) => (
@@ -11565,11 +13856,6 @@ export default function StudySynopsisStudio() {
                   <h2 className="mt-2 font-[Iowan_Old_Style,Palatino_Linotype,Book_Antiqua,serif] text-3xl text-slate-950">
                     Generate and export the study synopsis
                   </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                    Final assembly combines your configured sections with all prior study, PICO, statistical, and
-                    literature inputs. For interventional studies, the current schedule of activities is appended to
-                    the Word export.
-                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -11597,12 +13883,6 @@ export default function StudySynopsisStudio() {
                 </div>
               </div>
 
-              {openHelpTab === "final" && (
-                <div className="mb-6">
-                  <TabHelpPanel tabId="final" />
-                </div>
-              )}
-
               <div className="mt-6 space-y-5">
                 {(finalSections.length ? finalSections : includedSections).map((section) => {
                   const auditSection = sections.find((candidate) => candidate.id === section.id)
@@ -11625,7 +13905,9 @@ export default function StudySynopsisStudio() {
                     <h3 className="font-[Iowan_Old_Style,Palatino_Linotype,Book_Antiqua,serif] text-2xl text-slate-950">
                       Schedule of Activities
                     </h3>
-                    <p className="mt-4 text-sm leading-7 text-slate-600">{schedule.purpose}</p>
+                    {schedule.purpose && !isBoilerplateSchedulePurpose(schedule.purpose) && (
+                      <p className="mt-4 text-sm leading-7 text-slate-600">{schedule.purpose}</p>
+                    )}
                     <div className="mt-4">
                       <ScheduleTable schedule={schedule} />
                     </div>
@@ -11636,6 +13918,96 @@ export default function StudySynopsisStudio() {
           </section>
         )}
       </div>
+
+      <OverlayModal
+        open={openProtocolGuardrailModal}
+        eyebrow="Protocol guardrails"
+        title={protocolGuardrailAssessment.label}
+        description={protocolGuardrailAssessment.summary}
+        onClose={() => setOpenProtocolGuardrailModal(false)}
+      >
+        <div className="space-y-3">
+          {protocolGuardrailAssessment.checks.map((check) => (
+            <section key={check.id} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">{check.label}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">{check.finding}</p>
+                </div>
+                <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${getProtocolGuardrailStatusTone(check.status)}`}>
+                  {getProtocolGuardrailStatusLabel(check.status)}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{check.action}</p>
+            </section>
+          ))}
+        </div>
+        <div className="mt-5 rounded-[20px] border border-sky-200 bg-sky-50 p-4">
+          <p className="text-sm font-semibold text-sky-950">How AI will use this</p>
+          <p className="mt-2 text-sm leading-6 text-sky-900">{buildProtocolGuardrailInstruction(study)}</p>
+        </div>
+      </OverlayModal>
+
+      <OverlayModal
+        open={openImpactAssessmentModal}
+        eyebrow="AI evidence impact"
+        title="Likely study impact"
+        description="Use this as a focused pressure-test of whether the current concept is stronger for publication, practice, HTA, guideline, or label-relevant impact."
+        onClose={() => setOpenImpactAssessmentModal(false)}
+      >
+        <ImpactAssessmentPanel assessment={impactAssessment} />
+      </OverlayModal>
+
+      <OverlayModal
+        open={openScheduleInsightsModal}
+        eyebrow="Operational diagnostics"
+        title={scheduleInsightsModalMode === "tradeoff" ? "SoA trade-off analysis" : "SoA complexity assessment"}
+        description={
+          scheduleInsightsModalMode === "tradeoff"
+            ? "Review possible schedule simplifications without crowding the editable Schedule of Activities table."
+            : "Review visit, assessment, and operational burden without crowding the editable Schedule of Activities table."
+        }
+        onClose={() => setOpenScheduleInsightsModal(false)}
+      >
+        <ScheduleInsightsPanel insights={scheduleInsights} mode={scheduleInsightsModalMode} />
+      </OverlayModal>
+
+      <OverlayModal
+        open={openScheduleRegenerationModal}
+        eyebrow="Schedule regeneration"
+        title="Tell AI what should change"
+        description="Use this only when the existing SoA needs a specific revision. Leave it blank to regenerate from the current study inputs."
+        onClose={() => setOpenScheduleRegenerationModal(false)}
+      >
+        <TextAreaField
+          label="Change request for regenerated schedule"
+          value={schedule.iterationPrompt}
+          onChange={(value) => updateScheduleMeta("iterationPrompt", value)}
+          placeholder="Example: simplify follow-up, reduce low-value safety labs, add PRO collection at baseline and Week 12, or make visit cadence more pragmatic."
+          rows={5}
+        />
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm leading-6 text-slate-600">
+            The regenerated SoA will use the current study design, PICO/statistics, optional literature inputs if enabled, and this change request.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setOpenScheduleRegenerationModal(false)}
+              className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleGenerateSchedule}
+              disabled={loadingAction !== null || !gates.schedule}
+              className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Sparkles className="h-4 w-4" />
+              {loadingAction === "schedule" ? "Regenerating..." : "Regenerate SoA"}
+            </button>
+          </div>
+        </div>
+      </OverlayModal>
 
       <OverlayModal
         open={openAiAssistantModal === "objectives"}

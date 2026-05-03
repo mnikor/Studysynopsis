@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 13.333 7.5">
+<rect x="0" y="0" width="13.333" height="7.5" rx="0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.012"/>
+<rect x="0" y="0" width="0.18" height="7.5" rx="0" fill="#D71920" stroke="#D71920" stroke-width="0.012"/>
+<text x="0.63" y="0.54" font-family="Aptos, Arial, sans-serif" font-size="0.09473684210526316" font-weight="700" fill="#D71920" text-anchor="start">STUDY SYNOPSIS STUDIO</text>
+<text x="0.63" y="0.9" font-family="Aptos, Arial, sans-serif" font-size="0.25263157894736843" font-weight="400" fill="#242424" text-anchor="start">How Study Synopsis Studio turns choices into a synopsis</text>
+<text x="0.6599999999999999" y="1.45" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">Logic map for primary intent, protocol guardrails, AI suggestions, alternatives, and evidence-impact feedback.</text>
+<rect x="0.55" y="2.05" width="5.4" height="2.15" rx="0.15" fill="#FFF7F7" stroke="#FFF7F7" stroke-width="0.012"/>
+<text x="0.98" y="2.6" font-family="Aptos, Arial, sans-serif" font-size="0.3157894736842105" font-weight="700" fill="#D71920" text-anchor="start">One combined first question</text>
+<text x="1.0" y="3.4400000000000004" font-family="Aptos, Arial, sans-serif" font-size="0.18947368421052632" font-weight="700" fill="#242424" text-anchor="start">What is this study mainly trying to achieve?</text>
+<line x1="6.15" y1="3.08" x2="7.300000000000001" y2="3.08" stroke="#8A1538" stroke-width="0.02666666666666667" marker-end="url(#arrow)"/>
+<text x="7.63" y="2.4200000000000004" font-family="Aptos, Arial, sans-serif" font-size="0.21052631578947367" font-weight="700" fill="#242424" text-anchor="start">The app translates that answer into program intent, evidence destination, protocol discipline, AI suggestion constraints, and downstream drafting behavior.</text>
+<rect x="7.55" y="4.45" width="1.8" height="0.38" rx="0.15" fill="#FDECEC" stroke="#FDECEC" stroke-width="0.012"/><text x="8.45" y="4.67" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="700" fill="#D71920" text-anchor="middle">Tab 1</text>
+<rect x="9.55" y="4.45" width="1.8" height="0.38" rx="0.15" fill="#E7F5FF" stroke="#E7F5FF" stroke-width="0.012"/><text x="10.450000000000001" y="4.67" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="700" fill="#1864AB" text-anchor="middle">AI guardrails</text>
+<rect x="11.55" y="4.45" width="1.2" height="0.38" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/><text x="12.15" y="4.67" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="700" fill="#242424" text-anchor="middle">Export</text>
+</svg>

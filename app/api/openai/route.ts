@@ -18,6 +18,9 @@ const studySchema = z.object({
   category: stringField,
   subcategory: stringField,
   developmentStage: stringField,
+  protocolGuardrailProfile: stringField,
+  phase3SafetyDataAvailable: stringField,
+  protocolGuardrailNotes: stringField,
   primaryEvidenceUseIntent: stringField,
   secondaryEvidenceUseIntents: stringArrayField,
   primaryStrategicObjective: stringField,
@@ -53,6 +56,9 @@ const importedStudySchema = z.object({
   category: requiredStringField,
   subcategory: requiredStringField,
   developmentStage: requiredStringField,
+  protocolGuardrailProfile: requiredStringField,
+  phase3SafetyDataAvailable: requiredStringField,
+  protocolGuardrailNotes: requiredStringField,
   primaryEvidenceUseIntent: requiredStringField,
   secondaryEvidenceUseIntents: requiredStringArrayField,
   primaryStrategicObjective: requiredStringField,
@@ -256,6 +262,7 @@ const requestSchema = z.discriminatedUnion("action", [
     action: z.literal("generate_study_schema"),
     study: studySchema,
     requestNote: stringField,
+    designPattern: stringField,
     orientation: z.enum(["horizontal", "vertical"]),
     detailLevel: z.enum(["simple", "standard", "detailed"]),
   }),
@@ -543,7 +550,7 @@ async function parseStructuredInput<T extends z.ZodTypeAny>({
   userInput: Array<{ role: "user"; content: string | Array<{ type: string; text?: string; filename?: string; file_data?: string }> }>
   effort?: "low" | "medium" | "high"
   maxOutputTokens?: number
-}) {
+}): Promise<z.infer<T>> {
   const client = getClient()
   const buildRequest = (requestedEffort: "low" | "medium" | "high", requestedTokens: number) => ({
     model,
@@ -561,12 +568,12 @@ async function parseStructuredInput<T extends z.ZodTypeAny>({
     },
   })
 
-  let response = await client.responses.parse(buildRequest(effort, maxOutputTokens))
+  let response = await client.responses.parse(buildRequest(effort, maxOutputTokens) as never)
 
   if (response.status === "incomplete" && response.incomplete_details?.reason === "max_output_tokens") {
     const retryEffort = effort === "high" ? "medium" : "low"
     const retryTokens = Math.max(maxOutputTokens * 4, 12000)
-    response = await client.responses.parse(buildRequest(retryEffort, retryTokens))
+    response = await client.responses.parse(buildRequest(retryEffort, retryTokens) as never)
   }
 
   if (!response.output_parsed) {
@@ -580,8 +587,8 @@ async function parseStructuredInput<T extends z.ZodTypeAny>({
       }
     }
 
-    const refusal = response.output
-      .flatMap((item) => ("content" in item && Array.isArray(item.content) ? item.content : []))
+    const refusal = (response.output as Array<{ content?: Array<{ type?: string; refusal?: string }> }>)
+      .flatMap((item) => (Array.isArray(item.content) ? item.content : []))
       .find((content) => content.type === "refusal")
 
     if (refusal && "refusal" in refusal) {
@@ -612,7 +619,7 @@ async function parseStructuredOutput<T extends z.ZodTypeAny>({
   payload: unknown
   effort?: "low" | "medium" | "high"
   maxOutputTokens?: number
-}) {
+}): Promise<z.infer<T>> {
   return parseStructuredInput({
     schema,
     schemaName,
@@ -633,6 +640,8 @@ function extractPicoStatsPrompt() {
     "You are a senior clinical development strategist and biostatistician drafting a study synopsis.",
     "Use the provided study design data to produce clean, publication-ready PICO elements and draft statistical assumptions.",
     "Pay close attention to development stage, strategic objective, evidence use intent, therapeutic area, disease, and user-selected endpoints.",
+    "If protocolGuardrailNotes is provided, apply it when deciding objective, endpoint, estimand, sample-size, and data-collection discipline.",
+    "Do not add PRO/COA, PK/PD, biomarkers, biospecimens, special imaging, ECG, extra labs, wearables, or remote assessments unless they are tied to objectives, endpoint interpretation, safety, dose, population definition, feasibility, or the declared decision use.",
     "Keep outputs concise but specific. Do not use placeholders like TBD unless the input is truly missing.",
     "Return text that is suitable for direct editing in a synopsis workflow.",
     "The prompt field in both pico and stats should be a practical follow-up prompt for a future OpenAI refinement call.",
@@ -645,6 +654,8 @@ function objectiveSuggestionPrompt() {
     "Use the study's development stage, strategic objective, evidence use intent, therapeutic area, disease, intervention, comparator, line of therapy or setting, suggested endpoints, study type, and optional requestNote to propose synopsis-ready research objectives.",
     "Research objectives must remain scientific and testable. Do not write objectives as 'support HTA', 'support market access', 'support label change', or any other strategic-program phrasing.",
     "Use strategic objective and evidence use intent to shape comparator rigor, patient-centered support, utilization support, and design framing, not to replace the scientific question being tested.",
+    "If protocolGuardrailNotes is provided, follow it. Practice-informing PED guardrails mean focused objectives, typically no more than 5 objectives, no strategic-program phrasing as the scientific objective, simple design, explicit duration, and no extra data collection unless decision-critical.",
+    "Do not add PRO/COA, PK/PD, biomarkers, biospecimens, or special assessment objectives by default. Add them only when their decision-critical role is explicit.",
     "Return exactly 3 differentiated option packages: one balanced, one pragmatic or feasibility-oriented, and one assertive or request-shaped alternative.",
     "Each option must include label, positioning, one strong primary objective, a concise array of 2 to 4 secondary objectives, a draft design overview, and an alignment assessment.",
     "If requestNote conflicts with the current study context, do not comply blindly. Mark the option as partially_aligned or conflicts, explain the issue clearly, and suggest safer alternatives.",
@@ -783,6 +794,9 @@ function endpointSuggestionPrompt() {
   return [
     "You are a senior clinical strategist and endpoint specialist drafting a study synopsis.",
     "Use the study objective, development stage, evidence use intent, disease, intervention, strategic intent, study type, and optional requestNote to propose endpoint packages.",
+    "If protocolGuardrailNotes is provided, follow it. Default to a lean, decision-critical endpoint set and avoid exploratory endpoints unless individually justified.",
+    "Treat PRO/COA, PK/PD, biomarkers, biospecimens, subgroup analyses, special imaging, ECG, extra labs, wearables, and remote assessments as special assessments. Include them only when each one materially supports the objective, primary/key secondary endpoint, safety, dose, population definition, feasibility, or declared decision use.",
+    "If a special assessment is included, state its rationale briefly in the option rationale or alignment assessment; otherwise omit it.",
     "Return exactly 3 differentiated option packages: one balanced, one pragmatic or lower-burden, and one assertive or request-shaped alternative.",
     "Each option must include label, positioning, one primary endpoint, focused secondary and exploratory endpoint lists, a short rationale, and an alignment assessment.",
     "Default to a lean endpoint package. In most cases, return 1 primary endpoint, 1 to 2 key secondary endpoints, and no more than 1 exploratory endpoint only when it is clearly justified.",
@@ -882,6 +896,8 @@ function populationSuggestionPrompt() {
   return [
     "You are a clinical development physician and protocol writer drafting a target population statement.",
     "Use the disease, intervention, development stage, evidence use intent, study objective, endpoint package, and line of therapy or setting to draft synopsis-ready population wording and eligibility highlights.",
+    "If protocolGuardrailNotes is provided, keep eligibility inclusive, verifiable, and limited to safety, interpretability, and feasibility-critical criteria.",
+    "Do not add biomarker, biospecimen, PK/PD, imaging, or PRO eligibility requirements unless needed for population definition, endpoint interpretation, safety, dose, or feasibility.",
     "Return one concise population paragraph, one concise block of eligibility highlights, and a brief rationale.",
     "Tighten or broaden the population in a way that fits the declared evidence destination.",
     "Do not invent highly specific criteria unless the input supports them.",
@@ -908,6 +924,7 @@ function impactAssessmentPrompt() {
     "Return exactly 5 domains in this order: guideline, label, publication, practice, hta.",
     "For each domain, provide id, label, score from 0 to 100, impact as low medium or high, and one concise rationale.",
     "Be conservative. Do not overstate label or guideline potential if comparator strength, endpoint relevance, or design strength is weak.",
+    "If protocolGuardrailNotes is provided, use it to identify avoidable complexity, excessive endpoints, missing duration, or data-collection bloat as blockers.",
     "Use corporate clinical-development language: direct, concise, and decision-oriented.",
     "Also return a short executive summary, a short list of current blockers, and a short list of strengthenActions.",
   ].join("\n")
@@ -918,13 +935,20 @@ function studySchemaPrompt() {
     "You are a senior clinical strategist designing a study schema diagram for a study synopsis workspace.",
     "Return structured diagram data, not SVG, not prose, and not layout instructions tied to pixels.",
     "The schema must fit the study category and subtype. Handle classic interventional studies, complex multi-cohort or adaptive interventional designs, observational studies, evidence synthesis, non-clinical work, and RWE secondary database research.",
+    "Use designPattern as the governing visual pattern when provided. Supported patterns include parallel_group, single_arm, cohort_rwe, platform_master_protocol, adaptive, crossover, substudy_enabled, evidence_synthesis, and non_clinical.",
+    "For platform_master_protocol, show master protocol entry, shared infrastructure/control if relevant, active arms/cohorts, arm entry/exit or graduation logic, and integrated readout. Do not draw every arm if it would crowd the slide.",
+    "For adaptive, show the interim adaptation checkpoint and the adaptation decision type at high level, such as futility, enrichment, dose/arm selection, or sample-size re-estimation.",
+    "For crossover, show sequence assignment, treatment period 1, washout or transition, treatment period 2, and within-participant readout at a high level.",
+    "For substudy_enabled, separate the main study flow from optional substudy modules such as biomarker, PK/PD, imaging, PRO, or regional substudy only when they are decision-critical.",
     "The diagram must feel like a single-slide executive schema, not a full process map.",
+    "If protocolGuardrailNotes is provided, keep the schema lean and avoid showing protocol-template detail, SoA detail, or excessive assessment detail.",
     "Use lanes to group related parts of the design. Use nodes to represent only the major stages, cohorts, arms, assessments, decision points, analyses, and outputs that matter at synopsis level.",
     "Summarize repeated assessments into one high-level node such as Key assessments or Outcome capture. Summarize multiple analyses or interims into one high-level readout node unless the requested detail level explicitly justifies more.",
     "Use edges to show the main study flow and logical dependencies. Use dashed edges only for optional, supportive, or inferential relationships.",
     "Prefer one main path. Avoid fan-out unless the design truly depends on distinct arms or cohorts.",
     "Keep labels concise and decision-oriented. Use subtitles only when they add essential specificity.",
     "Include notes highlighting what the viewer should understand from the diagram.",
+    "The app renders the schema in a J&J-style palette: red emphasis, white cards, soft red panels, neutral gray text. Keep labels concise enough for that executive-slide visual style.",
     "If detailLevel is simple, return at most 6 nodes, at most 4 lanes, and at most 6 edges.",
     "If detailLevel is standard, return at most 8 nodes, at most 4 lanes, and at most 8 edges.",
     "If detailLevel is detailed, return at most 10 nodes, at most 5 lanes, and at most 12 edges.",
@@ -938,6 +962,7 @@ function literaturePrompt() {
     "You are an evidence synthesis and medical writing expert preparing a synopsis literature plan.",
     "Use the study and PICO data to define a pragmatic background search strategy that supports the synopsis rationale section.",
     "The literature framing should reflect the declared evidence destination and development stage, not just the disease area.",
+    "If protocolGuardrailNotes is provided, keep the literature plan focused on evidence gaps that justify the study decision, not broad background collection.",
     "Prefer multiline plain text for lists. Keep search strings usable and specific.",
     "The prompt field should be a reusable GenAI prompt for deeper literature synthesis.",
   ].join("\n")
@@ -948,6 +973,7 @@ function draftSectionsPrompt() {
     "You are a clinical protocol writer drafting section-level synopsis text.",
     "For each included section, preserve the provided id and title, follow the section prompt, and produce concise but useful draft prose.",
     "Use the study, PICO, statistical, literature, and schedule context together, including development stage and evidence use intent. Do not invent operational facts beyond reasonable drafting assumptions.",
+    "If protocolGuardrailNotes is provided, keep section drafts proportionate to that profile and avoid expanding objectives, endpoints, eligibility, or data collection beyond what was selected.",
     "Return one body per section.",
   ].join("\n")
 }
@@ -957,6 +983,7 @@ function finalSynopsisPrompt() {
     "You are a senior medical writer generating the final draft of a study synopsis.",
     "Use the provided study, PICO, statistical, literature, schedule, and section configuration data to write polished section bodies.",
     "Keep the final synopsis coherent with the declared development stage and evidence use intent.",
+    "If protocolGuardrailNotes is provided, preserve its discipline in the final synopsis: focused objectives, lean endpoints, explicit duration, and streamlined data collection.",
     "Preserve the provided id and title for each included section.",
     "Write with a professional synopsis tone suitable for cross-functional review. Avoid bullet-heavy output unless the section clearly needs it.",
   ].join("\n")
@@ -968,9 +995,13 @@ function schedulePrompt() {
     "Represent the schedule as structured data, not prose and not visual merge instructions.",
     "Columns must preserve a three-level hierarchy: study phase, period within phase, and visit within period.",
     "Rows must preserve grouped sections with child activity rows.",
+    "If the user-provided schedulePrompt contains an SoA structure mode, follow it. Support one common SoA, common SoA with conditional rows, separate arm/cohort logic, or separate dosing rows plus common assessment rows.",
+    "For studies with multiple drugs, arms, cohorts, regions, substudies, or dosing schedules, do not hide differences in ambiguous prose. Use concise conditional row notes or separate treatment-administration groupings so the reader can see which activities apply to which arm or cohort.",
     'Use "X" for required visits, blank for not required, and short qualifiers such as "X (as clinically indicated)" only when needed.',
     "For each row, return cells as an array of objects with { columnId, value }. Use the column ids defined in the output columns.",
     "Tailor the complexity to the study context, declared evidence destination, and any iteration instruction. Do not flatten the hierarchy.",
+    "If protocolGuardrailNotes is provided, use it to keep the SoA limited to assessments that directly support objectives, endpoints, estimands, safety, or feasibility.",
+    "PRO/COA, PK/PD, biomarkers, biospecimens, special imaging, ECG, extra labs, wearables, and remote assessments require explicit objective, endpoint, safety, dose, population-definition, feasibility, or decision-use justification. Do not add them as routine extras.",
     "Return a Word-friendly table structure suitable for rendering in a browser and export to a document.",
   ].join("\n")
 }
@@ -981,6 +1012,8 @@ function scheduleInsightsPrompt() {
     "Assess overall study complexity, identify the main complexity drivers, and score visit, assessment, and operational burden from 0 to 100.",
     "Then identify lower-risk opportunities to reduce or consolidate visits or assessments without materially weakening the study objective, primary endpoint support, or essential safety capture.",
     "Use the declared evidence destination to judge how much rigor and visit intensity is justified.",
+    "If protocolGuardrailNotes is provided, use it to judge whether the SoA is proportionate. Practice-informing PED guardrails favor one time base, minimized visits, and only assessments that directly support objectives, endpoints, estimands, safety, or feasibility.",
+    "Specifically flag PRO/COA, PK/PD, biomarkers, biospecimens, special imaging, ECG, extra labs, wearables, and remote assessments when they do not clearly support the objective, endpoint package, safety, dose, population definition, feasibility, or decision use.",
     "Be conservative: protected elements must remain protected, and every recommendation must explain how data quality is preserved.",
     "Write with corporate clinical-development language: direct, concise, and decision-oriented.",
   ].join("\n")
@@ -1118,7 +1151,7 @@ export async function POST(request: Request) {
 
       return Response.json({
         ...result,
-        generatedAt: result.generatedAt || new Date().toISOString(),
+        generatedAt: new Date().toISOString(),
         provenance: "ai_generated",
       })
     }

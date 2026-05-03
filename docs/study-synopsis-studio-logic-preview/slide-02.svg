@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 13.333 7.5">
+<rect x="0" y="0" width="13.333" height="7.5" rx="0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.012"/>
+<rect x="0" y="0" width="0.18" height="7.5" rx="0" fill="#D71920" stroke="#D71920" stroke-width="0.012"/>
+<text x="0.63" y="0.54" font-family="Aptos, Arial, sans-serif" font-size="0.09473684210526316" font-weight="700" fill="#D71920" text-anchor="start">STUDY SYNOPSIS STUDIO</text>
+<text x="0.63" y="0.9" font-family="Aptos, Arial, sans-serif" font-size="0.25263157894736843" font-weight="400" fill="#242424" text-anchor="start">The workflow is intentionally staged</text>
+<text x="0.6599999999999999" y="1.45" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">Each downstream step consumes the current Tab 1 concept and warns when older generated content is stale.</text>
+<rect x="0.65" y="2.05" width="1.85" height="2.45" rx="0.15" fill="#FDECEC" stroke="#D71920" stroke-width="0.012"/>
+<text x="1.5750000000000002" y="2.52" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#D71920" text-anchor="middle">Study design</text>
+<text x="1.5750000000000002" y="3.12" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">Intent, disease, intervention, comparator, objectives, endpoints</text>
+<line x1="2.53" y1="3.2699999999999996" x2="2.71" y2="3.2699999999999996" stroke="#8A1538" stroke-width="0.02" marker-end="url(#arrow)"/>
+<rect x="2.72" y="2.05" width="1.85" height="2.45" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="3.6450000000000005" y="2.52" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="middle">Optional schema</text>
+<text x="3.6450000000000005" y="3.12" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">One-slide visual logic</text>
+<line x1="4.6000000000000005" y1="3.2699999999999996" x2="4.78" y2="3.2699999999999996" stroke="#8A1538" stroke-width="0.02" marker-end="url(#arrow)"/>
+<rect x="4.790000000000001" y="2.05" width="1.85" height="2.45" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="5.715000000000001" y="2.52" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="middle">PICO &amp; stats</text>
+<text x="5.715000000000001" y="3.12" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">Structured PICO + assumptions</text>
+<line x1="6.670000000000001" y1="3.2699999999999996" x2="6.8500000000000005" y2="3.2699999999999996" stroke="#8A1538" stroke-width="0.02" marker-end="url(#arrow)"/>
+<rect x="6.860000000000001" y="2.05" width="1.85" height="2.45" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="7.785000000000001" y="2.52" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="middle">Optional literature</text>
+<text x="7.785000000000001" y="3.12" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">Background evidence plan</text>
+<line x1="8.74" y1="3.2699999999999996" x2="8.92" y2="3.2699999999999996" stroke="#8A1538" stroke-width="0.02" marker-end="url(#arrow)"/>
+<rect x="8.930000000000001" y="2.05" width="1.85" height="2.45" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="9.855000000000002" y="2.52" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="middle">Optional SoA</text>
+<text x="9.855000000000002" y="3.12" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">Visit/assessment table</text>
+<line x1="10.81" y1="3.2699999999999996" x2="10.99" y2="3.2699999999999996" stroke="#8A1538" stroke-width="0.02" marker-end="url(#arrow)"/>
+<rect x="11.000000000000002" y="2.05" width="1.85" height="2.45" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="11.925000000000002" y="2.52" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="middle">Generate</text>
+<text x="11.925000000000002" y="3.12" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">Sections + Word export</text>
+<text x="6.5" y="5.92" font-family="Aptos, Arial, sans-serif" font-size="0.18947368421052632" font-weight="700" fill="#8A1538" text-anchor="middle">Principle: AI helps complete or challenge the concept, but the user selects what becomes part of the working study.</text>
+</svg>

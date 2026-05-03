@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 13.333 7.5">
+<rect x="0" y="0" width="13.333" height="7.5" rx="0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.012"/>
+<rect x="0" y="0" width="0.18" height="7.5" rx="0" fill="#D71920" stroke="#D71920" stroke-width="0.012"/>
+<text x="0.63" y="0.54" font-family="Aptos, Arial, sans-serif" font-size="0.09473684210526316" font-weight="700" fill="#D71920" text-anchor="start">STUDY SYNOPSIS STUDIO</text>
+<text x="0.63" y="0.9" font-family="Aptos, Arial, sans-serif" font-size="0.25263157894736843" font-weight="400" fill="#242424" text-anchor="start">What the guardrails actually check</text>
+<text x="0.6599999999999999" y="1.45" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">The modal focuses on avoidable complexity and data-collection bloat.</text>
+<rect x="0.72" y="1.75" width="3.55" height="1.32" rx="0.15" fill="#FDECEC" stroke="#D71920" stroke-width="0.012"/>
+<text x="1.02" y="2.15" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#D71920" text-anchor="start">Objective count</text>
+<text x="1.02" y="2.52" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="start">Usually ≤5; trim or justify extra objectives.</text>
+<rect x="4.77" y="1.75" width="3.55" height="1.32" rx="0.15" fill="#FDECEC" stroke="#D71920" stroke-width="0.012"/>
+<text x="5.069999999999999" y="2.15" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#D71920" text-anchor="start">Endpoint focus</text>
+<text x="5.069999999999999" y="2.52" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="start">1 primary + focused key secondary endpoints.</text>
+<rect x="8.82" y="1.75" width="3.55" height="1.32" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="9.120000000000001" y="2.15" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="start">Duration</text>
+<text x="9.120000000000001" y="2.52" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="start">Enrollment, treatment/observation, follow-up explicit.</text>
+<rect x="0.72" y="3.4699999999999998" width="3.55" height="1.32" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="1.02" y="3.87" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="start">Comparator</text>
+<text x="1.02" y="4.239999999999999" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="start">Control or benchmark consistent across outputs.</text>
+<rect x="4.77" y="3.4699999999999998" width="3.55" height="1.32" rx="0.15" fill="#FDECEC" stroke="#D71920" stroke-width="0.012"/>
+<text x="5.069999999999999" y="3.87" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#D71920" text-anchor="start">Special assessments</text>
+<text x="5.069999999999999" y="4.239999999999999" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="start">PRO, PK/PD, biomarkers, imaging, labs only if decision-critical.</text>
+<rect x="8.82" y="3.4699999999999998" width="3.55" height="1.32" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="9.120000000000001" y="3.87" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="start">Eligibility</text>
+<text x="9.120000000000001" y="4.239999999999999" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="start">Inclusive, verifiable, non-duplicative criteria.</text>
+</svg>

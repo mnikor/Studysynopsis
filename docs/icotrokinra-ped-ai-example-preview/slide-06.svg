@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 13.333 7.5">
+<rect x="0" y="0" width="13.333" height="7.5" rx="0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.012"/>
+<rect x="0" y="0" width="0.18" height="7.5" rx="0" fill="#D71920" stroke="#D71920" stroke-width="0.012"/>
+<text x="0.63" y="0.54" font-family="Aptos, Arial, sans-serif" font-size="0.09473684210526316" font-weight="700" fill="#D71920" text-anchor="start">STUDY SYNOPSIS STUDIO</text>
+<text x="0.63" y="0.9" font-family="Aptos, Arial, sans-serif" font-size="0.25263157894736843" font-weight="400" fill="#242424" text-anchor="start">Example endpoint package AI would propose</text>
+<text x="0.6599999999999999" y="1.45" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">The app should keep the endpoint package focused enough to answer the research question without data-collection bloat.</text>
+<rect x="0.75" y="1.72" width="3.9333333333333336" height="0.6928571428571428" fill="#FDECEC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="1.96" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#D71920">Endpoint role</text>
+<rect x="4.683333333333334" y="1.72" width="3.9333333333333336" height="0.6928571428571428" fill="#FDECEC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="1.96" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#D71920">Suggested endpoint</text>
+<rect x="8.616666666666667" y="1.72" width="3.9333333333333336" height="0.6928571428571428" fill="#FDECEC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="1.96" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#D71920">PED rationale</text>
+<rect x="0.75" y="2.412857142857143" width="3.9333333333333336" height="0.6928571428571428" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="2.652857142857143" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Primary</text>
+<rect x="4.683333333333334" y="2.412857142857143" width="3.9333333333333336" height="0.6928571428571428" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="2.652857142857143" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">PASI 90 response at Week 16</text>
+<rect x="8.616666666666667" y="2.412857142857143" width="3.9333333333333336" height="0.6928571428571428" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="2.652857142857143" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Directly tests comparative skin-clearance objective</text>
+<rect x="0.75" y="3.105714285714286" width="3.9333333333333336" height="0.6928571428571428" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="3.345714285714286" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Key secondary</text>
+<rect x="4.683333333333334" y="3.105714285714286" width="3.9333333333333336" height="0.6928571428571428" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="3.345714285714286" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">PASI 100 and/or sPGA 0/1 at Week 16</text>
+<rect x="8.616666666666667" y="3.105714285714286" width="3.9333333333333336" height="0.6928571428571428" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="3.345714285714286" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Depth of response; keep as limited key support</text>
+<rect x="0.75" y="3.798571428571428" width="3.9333333333333336" height="0.6928571428571428" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="4.038571428571428" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Key secondary</text>
+<rect x="4.683333333333334" y="3.798571428571428" width="3.9333333333333336" height="0.6928571428571428" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="4.038571428571428" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Durability of PASI 90 through Week 52</text>
+<rect x="8.616666666666667" y="3.798571428571428" width="3.9333333333333336" height="0.6928571428571428" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="4.038571428571428" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Supports practice interpretation over time</text>
+<rect x="0.75" y="4.491428571428571" width="3.9333333333333336" height="0.6928571428571428" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="4.731428571428571" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Safety</text>
+<rect x="4.683333333333334" y="4.491428571428571" width="3.9333333333333336" height="0.6928571428571428" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="4.731428571428571" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Treatment-emergent AEs, serious AEs, discontinuations</text>
+<rect x="8.616666666666667" y="4.491428571428571" width="3.9333333333333336" height="0.6928571428571428" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="4.731428571428571" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Essential safety/tolerability context</text>
+<rect x="0.75" y="5.184285714285714" width="3.9333333333333336" height="0.6928571428571428" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="5.424285714285714" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Optional PRO</text>
+<rect x="4.683333333333334" y="5.184285714285714" width="3.9333333333333336" height="0.6928571428571428" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="5.424285714285714" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">DLQI response/change at prespecified timepoints</text>
+<rect x="8.616666666666667" y="5.184285714285714" width="3.9333333333333336" height="0.6928571428571428" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="5.424285714285714" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Only if patient-relevant or HTA/practice use is important</text>
+<rect x="0.75" y="5.877142857142856" width="3.9333333333333336" height="0.6928571428571428" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="6.1171428571428565" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Not default</text>
+<rect x="4.683333333333334" y="5.877142857142856" width="3.9333333333333336" height="0.6928571428571428" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="6.1171428571428565" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Broad biomarkers, PK/PD, large exploratory panels</text>
+<rect x="8.616666666666667" y="5.877142857142856" width="3.9333333333333336" height="0.6928571428571428" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="6.1171428571428565" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Remove unless a specific objective requires them</text>
+</svg>

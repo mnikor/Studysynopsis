@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 13.333 7.5">
+<rect x="0" y="0" width="13.333" height="7.5" rx="0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.012"/>
+<rect x="0" y="0" width="0.18" height="7.5" rx="0" fill="#D71920" stroke="#D71920" stroke-width="0.012"/>
+<text x="0.63" y="0.54" font-family="Aptos, Arial, sans-serif" font-size="0.09473684210526316" font-weight="700" fill="#D71920" text-anchor="start">STUDY SYNOPSIS STUDIO</text>
+<text x="0.63" y="0.9" font-family="Aptos, Arial, sans-serif" font-size="0.25263157894736843" font-weight="400" fill="#242424" text-anchor="start">Impact assessment output for the example</text>
+<text x="0.6599999999999999" y="1.45" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">The app should give immediate feedback so the user can iterate before downstream drafting.</text>
+<rect x="0.75" y="1.72" width="3.9333333333333336" height="0.7583333333333333" fill="#FDECEC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="1.96" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#D71920">Impact domain</text>
+<rect x="4.683333333333334" y="1.72" width="3.9333333333333336" height="0.7583333333333333" fill="#FDECEC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="1.96" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#D71920">Likely signal</text>
+<rect x="8.616666666666667" y="1.72" width="3.9333333333333336" height="0.7583333333333333" fill="#FDECEC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="1.96" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#D71920">What would strengthen it</text>
+<rect x="0.75" y="2.4783333333333335" width="3.9333333333333336" height="0.7583333333333333" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="2.7183333333333337" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Practice / guideline</text>
+<rect x="4.683333333333334" y="2.4783333333333335" width="3.9333333333333336" height="0.7583333333333333" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="2.7183333333333337" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Moderate</text>
+<rect x="8.616666666666667" y="2.4783333333333335" width="3.9333333333333336" height="0.7583333333333333" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="2.7183333333333337" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Comparator credibility, clinical endpoint relevance, durab</text>
+<rect x="0.75" y="3.2366666666666664" width="3.9333333333333336" height="0.7583333333333333" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="3.4766666666666666" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">HTA / access</text>
+<rect x="4.683333333333334" y="3.2366666666666664" width="3.9333333333333336" height="0.7583333333333333" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="3.4766666666666666" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Moderate to high</text>
+<rect x="8.616666666666667" y="3.2366666666666664" width="3.9333333333333336" height="0.7583333333333333" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="3.4766666666666666" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Add one patient-relevant QoL endpoint and clear comparativ</text>
+<rect x="0.75" y="3.995" width="3.9333333333333336" height="0.7583333333333333" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="4.235" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Publication</text>
+<rect x="4.683333333333334" y="3.995" width="3.9333333333333336" height="0.7583333333333333" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="4.235" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">High</text>
+<rect x="8.616666666666667" y="3.995" width="3.9333333333333336" height="0.7583333333333333" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="4.235" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Focused comparative question and clinically meaningful end</text>
+<rect x="0.75" y="4.753333333333333" width="3.9333333333333336" height="0.7583333333333333" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="4.993333333333333" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Label</text>
+<rect x="4.683333333333334" y="4.753333333333333" width="3.9333333333333336" height="0.7583333333333333" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="4.993333333333333" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Low to moderate</text>
+<rect x="8.616666666666667" y="4.753333333333333" width="3.9333333333333336" height="0.7583333333333333" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="4.993333333333333" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Depends on regulatory context; practice-informing PED is n</text>
+<rect x="0.75" y="5.511666666666667" width="3.9333333333333336" height="0.7583333333333333" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="0.8200000000000001" y="5.751666666666667" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="700" fill="#242424">Safety/risk</text>
+<rect x="4.683333333333334" y="5.511666666666667" width="3.9333333333333336" height="0.7583333333333333" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="4.753333333333334" y="5.751666666666667" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Supportive</text>
+<rect x="8.616666666666667" y="5.511666666666667" width="3.9333333333333336" height="0.7583333333333333" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="0.01"/>
+<text x="8.686666666666667" y="5.751666666666667" font-family="Aptos, Arial, sans-serif" font-size="0.105" font-weight="400" fill="#242424">Keep standard safety capture proportionate and interpretab</text>
+<text x="6.625" y="6.67" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="700" fill="#8A1538" text-anchor="middle">AI should not overstate label or guideline impact; it should recommend concrete design improvements instead.</text>
+</svg>

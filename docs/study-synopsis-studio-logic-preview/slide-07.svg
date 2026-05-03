@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 13.333 7.5">
+<rect x="0" y="0" width="13.333" height="7.5" rx="0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.012"/>
+<rect x="0" y="0" width="0.18" height="7.5" rx="0" fill="#D71920" stroke="#D71920" stroke-width="0.012"/>
+<text x="0.63" y="0.54" font-family="Aptos, Arial, sans-serif" font-size="0.09473684210526316" font-weight="700" fill="#D71920" text-anchor="start">STUDY SYNOPSIS STUDIO</text>
+<text x="0.63" y="0.9" font-family="Aptos, Arial, sans-serif" font-size="0.25263157894736843" font-weight="400" fill="#242424" text-anchor="start">AI suggestions are selectable alternatives, not auto-fill</text>
+<text x="0.6599999999999999" y="1.45" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">The AI proposes packages; the user chooses which parts become working study content.</text>
+<rect x="0.75" y="1.8" width="2.1" height="2.45" rx="0.15" fill="#FDECEC" stroke="#D71920" stroke-width="0.012"/>
+<text x="1.8" y="2.27" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#D71920" text-anchor="middle">Readiness</text>
+<text x="1.8" y="2.87" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">Needs only essential context for that field</text>
+<line x1="2.88" y1="3.02" x2="3.12" y2="3.02" stroke="#8A1538" stroke-width="0.02" marker-end="url(#arrow)"/>
+<rect x="3.13" y="1.8" width="2.1" height="2.45" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="4.18" y="2.27" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="middle">Generate</text>
+<text x="4.18" y="2.87" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">3 option packages: balanced, pragmatic, assertive/request-shaped</text>
+<line x1="5.260000000000001" y1="3.02" x2="5.500000000000001" y2="3.02" stroke="#8A1538" stroke-width="0.02" marker-end="url(#arrow)"/>
+<rect x="5.51" y="1.8" width="2.1" height="2.45" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="6.56" y="2.27" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="middle">Pushback</text>
+<text x="6.56" y="2.87" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">Flags conflicts with study context or guardrails</text>
+<line x1="7.64" y1="3.02" x2="7.88" y2="3.02" stroke="#8A1538" stroke-width="0.02" marker-end="url(#arrow)"/>
+<rect x="7.89" y="1.8" width="2.1" height="2.45" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="8.94" y="2.27" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="middle">Select</text>
+<text x="8.94" y="2.87" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">User accepts primary objective, selected secondary objectives, design text, endpoints</text>
+<line x1="10.02" y1="3.02" x2="10.26" y2="3.02" stroke="#8A1538" stroke-width="0.02" marker-end="url(#arrow)"/>
+<rect x="10.27" y="1.8" width="2.1" height="2.45" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="11.32" y="2.27" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="700" fill="#242424" text-anchor="middle">Merge</text>
+<text x="11.32" y="2.87" font-family="Aptos, Arial, sans-serif" font-size="0.10526315789473684" font-weight="400" fill="#475569" text-anchor="middle">Existing accepted content is kept unless explicitly replaced</text>
+<text x="6.55" y="5.97" font-family="Aptos, Arial, sans-serif" font-size="0.16842105263157894" font-weight="700" fill="#8A1538" text-anchor="middle">Example: if user asks for broad biomarkers but intent is practice-informing, AI should mark the option as partially aligned or conflicting and propose a leaner alternative.</text>
+</svg>

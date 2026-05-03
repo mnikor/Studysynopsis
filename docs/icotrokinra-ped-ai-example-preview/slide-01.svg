@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 13.333 7.5">
+<rect x="0" y="0" width="13.333" height="7.5" rx="0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.012"/>
+<rect x="0" y="0" width="0.18" height="7.5" rx="0" fill="#D71920" stroke="#D71920" stroke-width="0.012"/>
+<text x="0.63" y="0.54" font-family="Aptos, Arial, sans-serif" font-size="0.09473684210526316" font-weight="700" fill="#D71920" text-anchor="start">STUDY SYNOPSIS STUDIO</text>
+<text x="0.63" y="0.9" font-family="Aptos, Arial, sans-serif" font-size="0.25263157894736843" font-weight="400" fill="#242424" text-anchor="start">Icotrokinra example: how PED guardrails shape AI suggestions</text>
+<text x="0.6599999999999999" y="1.45" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">Illustrative study-design walkthrough using a psoriasis concept: icotrokinra versus risankizumab, focused endpoints, streamlined data collection, and impact feedback.</text>
+<rect x="0.65" y="1.95" width="5.15" height="2.1" rx="0.15" fill="#FFF7F7" stroke="#FFF7F7" stroke-width="0.012"/>
+<text x="1.06" y="2.5" font-family="Aptos, Arial, sans-serif" font-size="0.3368421052631579" font-weight="700" fill="#D71920" text-anchor="start">Example study</text>
+<text x="1.08" y="3.3400000000000003" font-family="Aptos, Arial, sans-serif" font-size="0.18947368421052632" font-weight="700" fill="#242424" text-anchor="start">Moderate-to-severe plaque psoriasis</text>
+<line x1="5.95" y1="3.0" x2="7.050000000000001" y2="3.0" stroke="#8A1538" stroke-width="0.02666666666666667" marker-end="url(#arrow)"/>
+<rect x="7.25" y="1.85" width="4.75" height="2.35" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="7.63" y="2.37" font-family="Aptos, Arial, sans-serif" font-size="0.18947368421052632" font-weight="700" fill="#242424" text-anchor="start">What AI is asked to do</text>
+<text x="7.63" y="2.9400000000000004" font-family="Aptos, Arial, sans-serif" font-size="0.16842105263157894" font-weight="400" fill="#475569" text-anchor="start">Translate the study intent into focused objectives, endpoints, SoA logic, and an evidence-impact view under PED-style discipline.</text>
+<rect x="1.0" y="4.95" width="2.25" height="0.42" rx="0.15" fill="#FDECEC" stroke="#FDECEC" stroke-width="0.012"/><text x="2.125" y="5.17" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="700" fill="#D71920" text-anchor="middle">Icotrokinra</text>
+<rect x="3.55" y="4.95" width="2.25" height="0.42" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/><text x="4.675" y="5.17" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="700" fill="#242424" text-anchor="middle">Risankizumab comparator</text>
+<rect x="6.1" y="4.95" width="2.0" height="0.42" rx="0.15" fill="#E7F5FF" stroke="#E7F5FF" stroke-width="0.012"/><text x="7.1" y="5.17" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="700" fill="#1864AB" text-anchor="middle">PASI 90</text>
+<rect x="8.4" y="4.95" width="2.25" height="0.42" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/><text x="9.525" y="5.17" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="700" fill="#242424" text-anchor="middle">52-week follow-up</text>
+<text x="6.75" y="6.569999999999999" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="middle">Example only: content is generated to demonstrate app logic and should be reviewed by clinical, statistics, and regulatory experts before use.</text>
+</svg>

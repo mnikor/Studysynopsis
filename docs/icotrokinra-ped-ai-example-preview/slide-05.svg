@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 13.333 7.5">
+<rect x="0" y="0" width="13.333" height="7.5" rx="0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.012"/>
+<rect x="0" y="0" width="0.18" height="7.5" rx="0" fill="#D71920" stroke="#D71920" stroke-width="0.012"/>
+<text x="0.63" y="0.54" font-family="Aptos, Arial, sans-serif" font-size="0.09473684210526316" font-weight="700" fill="#D71920" text-anchor="start">STUDY SYNOPSIS STUDIO</text>
+<text x="0.63" y="0.9" font-family="Aptos, Arial, sans-serif" font-size="0.25263157894736843" font-weight="400" fill="#242424" text-anchor="start">Example AI objective proposal</text>
+<text x="0.6599999999999999" y="1.45" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">PED guardrails push the wording toward a scientific question, not a strategic slogan.</text>
+<rect x="0.75" y="1.72" width="3.4" height="4.8" rx="0.15" fill="#FDECEC" stroke="#D71920" stroke-width="0.012"/>
+<text x="1.08" y="2.22" font-family="Aptos, Arial, sans-serif" font-size="0.17894736842105263" font-weight="700" fill="#D71920" text-anchor="start">Primary objective</text>
+<text x="1.08" y="2.77" font-family="Aptos, Arial, sans-serif" font-size="0.15789473684210525" font-weight="400" fill="#242424" text-anchor="start">Evaluate whether icotrokinra improves skin clearance versus risankizumab in adults with moderate-to-severe plaque psoriasis by assessing PASI 90 response at Week 16.</text>
+<text x="1.08" y="5.37" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">Why: clinical, comparative, testable, and aligned to practice/HTA interpretation.</text>
+<rect x="4.65" y="1.72" width="3.5" height="4.8" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="4.98" y="2.22" font-family="Aptos, Arial, sans-serif" font-size="0.17894736842105263" font-weight="700" fill="#242424" text-anchor="start">Focused secondary objectives</text>
+<text x="4.98" y="2.77" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="400" fill="#242424" text-anchor="start">• Assess depth of skin clearance using PASI 100 and sPGA 0/1 at Week 16.</text>
+<text x="4.98" y="2.888181818181818" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="400" fill="#242424" text-anchor="start">• Assess durability of response through Week 52.</text>
+<text x="4.98" y="3.0063636363636363" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="400" fill="#242424" text-anchor="start">• Characterize safety and tolerability.</text>
+<text x="4.98" y="3.1245454545454545" font-family="Aptos, Arial, sans-serif" font-size="0.1368421052631579" font-weight="400" fill="#242424" text-anchor="start">• Assess patient-relevant impact using one QoL measure if needed for HTA/practice use.</text>
+<rect x="8.65" y="1.72" width="3.45" height="4.8" rx="0.15" fill="#FFF7F7" stroke="#8A1538" stroke-width="0.012"/>
+<text x="8.98" y="2.22" font-family="Aptos, Arial, sans-serif" font-size="0.17894736842105263" font-weight="700" fill="#8A1538" text-anchor="start">AI pushback</text>
+<text x="8.98" y="2.77" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="400" fill="#242424" text-anchor="start">Avoid: ‘Evaluate whether icotrokinra can support HTA or guideline use.’</text>
+<text x="8.98" y="2.8972727272727274" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="400" fill="#242424" text-anchor="start"></text>
+<text x="8.98" y="3.0245454545454544" font-family="Aptos, Arial, sans-serif" font-size="0.14736842105263157" font-weight="400" fill="#242424" text-anchor="start">Avoid: too many mechanistic or exploratory objectives unless each is decision-critical.</text>
+</svg>

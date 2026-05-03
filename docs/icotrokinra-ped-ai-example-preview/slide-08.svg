@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 13.333 7.5">
+<rect x="0" y="0" width="13.333" height="7.5" rx="0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.012"/>
+<rect x="0" y="0" width="0.18" height="7.5" rx="0" fill="#D71920" stroke="#D71920" stroke-width="0.012"/>
+<text x="0.63" y="0.54" font-family="Aptos, Arial, sans-serif" font-size="0.09473684210526316" font-weight="700" fill="#D71920" text-anchor="start">STUDY SYNOPSIS STUDIO</text>
+<text x="0.63" y="0.9" font-family="Aptos, Arial, sans-serif" font-size="0.25263157894736843" font-weight="400" fill="#242424" text-anchor="start">Example SoA logic under PED guardrails</text>
+<text x="0.6599999999999999" y="1.45" font-family="Aptos, Arial, sans-serif" font-size="0.12631578947368421" font-weight="400" fill="#475569" text-anchor="start">AI should generate a schedule that can be understood quickly and defended operationally.</text>
+<rect x="0.8" y="1.7" width="2.6" height="1.15" rx="0.15" fill="#FDECEC" stroke="#D71920" stroke-width="0.012"/>
+<text x="2.1" y="2.22" font-family="Aptos, Arial, sans-serif" font-size="0.17894736842105263" font-weight="700" fill="#D71920" text-anchor="middle">Screening</text>
+<text x="2.1" y="2.6700000000000004" font-family="Aptos, Arial, sans-serif" font-size="0.11578947368421053" font-weight="400" fill="#475569" text-anchor="middle">≤28 days</text>
+<line x1="3.6" y1="2.28" x2="4.45" y2="2.28" stroke="#8A1538" stroke-width="0.02666666666666667" marker-end="url(#arrow)"/>
+<rect x="4.65" y="1.7" width="2.6" height="1.15" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="5.95" y="2.22" font-family="Aptos, Arial, sans-serif" font-size="0.17894736842105263" font-weight="700" fill="#242424" text-anchor="middle">Baseline</text>
+<text x="5.95" y="2.6700000000000004" font-family="Aptos, Arial, sans-serif" font-size="0.11578947368421053" font-weight="400" fill="#475569" text-anchor="middle">Day 1</text>
+<line x1="7.45" y1="2.28" x2="8.3" y2="2.28" stroke="#8A1538" stroke-width="0.02666666666666667" marker-end="url(#arrow)"/>
+<rect x="8.5" y="1.7" width="3.25" height="1.15" rx="0.15" fill="#E7F5FF" stroke="#1864AB" stroke-width="0.012"/>
+<text x="10.129999999999999" y="2.22" font-family="Aptos, Arial, sans-serif" font-size="0.17894736842105263" font-weight="700" fill="#1864AB" text-anchor="middle">Primary readout</text>
+<text x="10.129999999999999" y="2.6700000000000004" font-family="Aptos, Arial, sans-serif" font-size="0.11578947368421053" font-weight="400" fill="#475569" text-anchor="middle">Week 16 PASI 90</text>
+<rect x="1.3" y="4.0" width="3.0" height="1.15" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="2.8" y="4.4799999999999995" font-family="Aptos, Arial, sans-serif" font-size="0.15789473684210525" font-weight="700" fill="#242424" text-anchor="middle">Follow-up cadence</text>
+<text x="2.8" y="4.9399999999999995" font-family="Aptos, Arial, sans-serif" font-size="0.11578947368421053" font-weight="400" fill="#475569" text-anchor="middle">Weeks 28, 40, 52</text>
+<line x1="4.55" y1="4.58" x2="5.35" y2="4.58" stroke="#475569" stroke-width="0.02666666666666667" marker-end="url(#arrow)"/>
+<rect x="5.55" y="4.0" width="3.0" height="1.15" rx="0.15" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="0.012"/>
+<text x="7.05" y="4.4799999999999995" font-family="Aptos, Arial, sans-serif" font-size="0.15789473684210525" font-weight="700" fill="#242424" text-anchor="middle">Safety / tolerability</text>
+<text x="7.05" y="4.9399999999999995" font-family="Aptos, Arial, sans-serif" font-size="0.11578947368421053" font-weight="400" fill="#475569" text-anchor="middle">Proportionate checks</text>
+<line x1="8.8" y1="4.58" x2="9.600000000000001" y2="4.58" stroke="#475569" stroke-width="0.02666666666666667" marker-end="url(#arrow)"/>
+<rect x="9.8" y="4.0" width="2.35" height="1.15" rx="0.15" fill="#FFF7F7" stroke="#8A1538" stroke-width="0.012"/>
+<text x="10.975" y="4.4799999999999995" font-family="Aptos, Arial, sans-serif" font-size="0.15789473684210525" font-weight="700" fill="#8A1538" text-anchor="middle">30-day FU</text>
+<text x="10.975" y="4.9399999999999995" font-family="Aptos, Arial, sans-serif" font-size="0.11578947368421053" font-weight="400" fill="#475569" text-anchor="middle">Safety closeout</text>
+<text x="6.65" y="6.319999999999999" font-family="Aptos, Arial, sans-serif" font-size="0.15789473684210525" font-weight="700" fill="#8A1538" text-anchor="middle">SoA principle: avoid adding PK/PD, broad biomarkers, or dense visit schedules unless the objective or safety question requires them.</text>
+</svg>
