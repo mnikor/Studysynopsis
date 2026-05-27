@@ -494,6 +494,16 @@ type ScheduleRow = {
 type ScheduleProvenance = "empty" | "ai_generated" | "local_draft" | "manual" | "hybrid"
 type ScheduleTableLayout = "auto" | "single" | "split"
 type ScheduleStructureMode = "auto" | "common" | "conditional" | "separate_by_arm" | "dosing_plus_common"
+type ScheduleColumnAddMode = "same_period" | "new_period" | "new_phase"
+
+type ScheduleColumnDraft = {
+  mode: ScheduleColumnAddMode
+  anchorColumnId: string
+  phase: string
+  period: string
+  visit: string
+  footnote: string
+}
 
 type ScheduleForm = {
   purpose: string
@@ -558,6 +568,24 @@ type ScheduleInsights = {
   provenance: ScheduleInsightsProvenance
   complexity: ScheduleComplexityAssessment
   tradeoff: ScheduleTradeoffAssessment
+}
+
+type ScheduleLayoutRecommendation = {
+  generatedAt: string
+  provenance: "empty" | "ai_generated" | "local_draft"
+  recommendedLayout: ScheduleTableLayout
+  splitStrategy: "single" | "core_follow_up" | "balanced" | "manual_review"
+  splitPoint: string
+  summary: string
+  rationale: string
+  benefits: string[]
+  cautions: string[]
+}
+
+type ScheduleClarificationRequest = {
+  question: string
+  options: string[]
+  originalRequest: string
 }
 
 type StudySchemaOrientation = "horizontal" | "vertical"
@@ -1106,6 +1134,15 @@ const initialScheduleForm: ScheduleForm = {
   sourceFingerprint: "",
 }
 
+const emptyScheduleColumnDraft: ScheduleColumnDraft = {
+  mode: "same_period",
+  anchorColumnId: "",
+  phase: "",
+  period: "",
+  visit: "New visit",
+  footnote: "",
+}
+
 const initialScheduleInsights: ScheduleInsights = {
   focus: "",
   mode: "",
@@ -1128,6 +1165,26 @@ const initialScheduleInsights: ScheduleInsights = {
     safeguards: [],
   },
 }
+
+const initialScheduleLayoutRecommendation: ScheduleLayoutRecommendation = {
+  generatedAt: "",
+  provenance: "empty",
+  recommendedLayout: "auto",
+  splitStrategy: "single",
+  splitPoint: "",
+  summary: "",
+  rationale: "",
+  benefits: [],
+  cautions: [],
+}
+
+const QUICK_SCHEDULE_REGENERATION_PROMPTS = [
+  "Add Week 24 assessment visit.",
+  "Reduce data collection without weakening endpoints.",
+  "Split into two easier-to-review tables.",
+  "Make visits more pragmatic with wider windows or remote contacts.",
+  "Adapt for different arms, cohorts, or dosing schedules.",
+]
 
 const STORAGE_KEY = "study-synopsis-studio:v2"
 const PROJECTS_STORAGE_KEY = "study-synopsis-studio:projects:v1"
@@ -1591,9 +1648,9 @@ function getComplexityLevel(score: number): ComplexityLevel {
 }
 
 function getImpactTone(impact: AnalysisImpact) {
-  if (impact === "high") return "bg-rose-100 text-rose-800 border-rose-200"
+  if (impact === "high") return "bg-emerald-100 text-emerald-800 border-emerald-200"
   if (impact === "medium") return "bg-sky-50 text-[#1864AB] border-sky-300"
-  return "bg-emerald-100 text-emerald-800 border-emerald-200"
+  return "bg-rose-100 text-rose-800 border-rose-200"
 }
 
 function getImpactLabel(impact: AnalysisImpact) {
@@ -1629,6 +1686,30 @@ function getPeriodGroups(columns: ScheduleColumn[]) {
     groups.push({ key, label: column.period, span: 1, startIndex: index })
     return groups
   }, [])
+}
+
+function getScheduleAnchorColumn(schedule: ScheduleForm, anchorColumnId?: string) {
+  return schedule.columns.find((column) => column.id === anchorColumnId) || schedule.columns[schedule.columns.length - 1]
+}
+
+function buildScheduleColumnDraft(
+  schedule: ScheduleForm,
+  mode: ScheduleColumnAddMode = "same_period",
+  anchorColumnId?: string,
+  current?: Partial<ScheduleColumnDraft>,
+): ScheduleColumnDraft {
+  const anchor = getScheduleAnchorColumn(schedule, anchorColumnId || current?.anchorColumnId)
+
+  return {
+    ...emptyScheduleColumnDraft,
+    ...current,
+    mode,
+    anchorColumnId: anchor?.id || "",
+    phase: mode === "new_phase" ? "" : anchor?.phase || "Treatment Phase",
+    period: mode === "same_period" ? anchor?.period || "New period" : "",
+    visit: current?.visit?.trim() ? current.visit : "New visit",
+    footnote: current?.footnote || "",
+  }
 }
 
 function getScheduleRowGroups(rows: ScheduleRow[]) {
@@ -1819,6 +1900,188 @@ function getScheduleTablePresentation(schedule: ScheduleForm): {
           : "Split-table view selected. Earlier and later visits are separated for easier scanning.",
     tables: nonEmptyTables,
   }
+}
+
+function buildScheduleLayoutRecommendation(schedule: ScheduleForm): ScheduleLayoutRecommendation {
+  if (!schedule.columns.length || !schedule.rows.length) {
+    return {
+      ...initialScheduleLayoutRecommendation,
+      generatedAt: new Date().toISOString(),
+      provenance: "local_draft",
+      recommendedLayout: "single",
+      summary: "Generate the SoA before asking for a layout recommendation.",
+      rationale: "There are no visit columns or activity rows to evaluate yet.",
+      cautions: ["No display-layout change was applied."],
+    }
+  }
+
+  const followUpStartIndex = schedule.columns.findIndex((column, index) => index >= 2 && isFollowUpScheduleColumn(column))
+  const denseGrid =
+    schedule.columns.length >= 10 ||
+    (schedule.columns.length >= 8 && schedule.rows.length >= 12) ||
+    new Set(schedule.columns.map((column) => `${column.phase}::${column.period}`)).size >= 5
+  const currentPresentation = getScheduleTablePresentation({ ...schedule, tableLayout: "auto" })
+  const hasFollowUpSplit = followUpStartIndex >= 2 && schedule.columns.length - followUpStartIndex >= 2
+  const recommendedLayout: ScheduleTableLayout = currentPresentation.effectiveLayout === "split" || denseGrid ? "split" : "single"
+  const splitStrategy: ScheduleLayoutRecommendation["splitStrategy"] =
+    recommendedLayout === "single" ? "single" : hasFollowUpSplit ? "core_follow_up" : "balanced"
+  const splitPoint =
+    splitStrategy === "core_follow_up"
+      ? `Split before ${schedule.columns[followUpStartIndex].phase || schedule.columns[followUpStartIndex].visit || "follow-up"}`
+      : splitStrategy === "balanced"
+        ? "Split around the midpoint of the visit grid, preferring phase or period boundaries."
+        : "No split recommended."
+
+  return {
+    generatedAt: new Date().toISOString(),
+    provenance: "local_draft",
+    recommendedLayout,
+    splitStrategy,
+    splitPoint,
+    summary:
+      recommendedLayout === "split"
+        ? "Split view is recommended to reduce horizontal scanning while preserving the underlying SoA content."
+        : "Single-table view is recommended because the current visit grid remains readable.",
+    rationale:
+      recommendedLayout === "split"
+        ? hasFollowUpSplit
+          ? `The SoA has ${schedule.columns.length} visit columns and a distinct follow-up phase, so separating core visits from follow-up improves reviewability.`
+          : `The SoA has ${schedule.columns.length} visit columns across ${schedule.rows.length} activity rows, so a balanced split should improve readability.`
+        : `The SoA has ${schedule.columns.length} visit columns and ${schedule.rows.length} activity rows, which should still be manageable as one table.`,
+    benefits:
+      recommendedLayout === "split"
+        ? [
+            "Reduces right-scrolling in the browser.",
+            "Keeps section and activity columns visible with fewer visit columns per table.",
+            "Does not modify visits, rows, cells, or AI-generated SoA content.",
+          ]
+        : ["Keeps all visits in one continuous matrix.", "Avoids duplicating row context across two display tables."],
+    cautions:
+      recommendedLayout === "split"
+        ? [
+            "This is a display layout only; it does not create separate protocol SoAs.",
+            "Rows with no activity in one split segment are hidden in that segment to avoid low-value repetition.",
+          ]
+        : ["If additional visits are added later, rerun the recommendation."],
+  }
+}
+
+function normalizeScheduleLayoutRecommendation(
+  recommendation?: Partial<ScheduleLayoutRecommendation>,
+): ScheduleLayoutRecommendation {
+  const recommendedLayout: ScheduleTableLayout =
+    recommendation?.recommendedLayout === "single" ||
+    recommendation?.recommendedLayout === "split" ||
+    recommendation?.recommendedLayout === "auto"
+      ? recommendation.recommendedLayout
+      : "auto"
+  const splitStrategy: ScheduleLayoutRecommendation["splitStrategy"] =
+    recommendation?.splitStrategy === "core_follow_up" ||
+    recommendation?.splitStrategy === "balanced" ||
+    recommendation?.splitStrategy === "manual_review" ||
+    recommendation?.splitStrategy === "single"
+      ? recommendation.splitStrategy
+      : recommendedLayout === "split"
+        ? "balanced"
+        : "single"
+
+  return {
+    ...initialScheduleLayoutRecommendation,
+    ...recommendation,
+    recommendedLayout,
+    splitStrategy,
+    generatedAt: recommendation?.generatedAt || new Date().toISOString(),
+    provenance:
+      recommendation?.provenance === "ai_generated" || recommendation?.provenance === "local_draft"
+        ? recommendation.provenance
+        : "local_draft",
+    benefits: Array.isArray(recommendation?.benefits) ? recommendation.benefits : [],
+    cautions: Array.isArray(recommendation?.cautions) ? recommendation.cautions : [],
+  }
+}
+
+function buildScheduleRegenerationClarification(request: string): ScheduleClarificationRequest | null {
+  const normalized = request.trim().toLowerCase()
+
+  if (!normalized) return null
+
+  if (
+    /week\s*\d+|month\s*\d+|day\s*\d+|timepoint|time point|visit/.test(normalized) &&
+    !/efficacy|safety|lab|laboratory|imaging|scan|pro|patient-reported|biomarker|pk|pharmacodynamic|dose|dosing|assessment/.test(
+      normalized,
+    )
+  ) {
+    return {
+      question: "What should the added or changed timepoint include?",
+      options: [
+        "Efficacy assessments only",
+        "Safety assessments only",
+        "Efficacy and safety assessments",
+        "Same assessments as the nearest comparable visit",
+      ],
+      originalRequest: request,
+    }
+  }
+
+  if (
+    /reduce|simplify|streamline|minimi[sz]e|less data|data collection/.test(normalized) &&
+    !/primary|endpoint|safety|without weakening|without compromising|preserve|protect/.test(normalized)
+  ) {
+    return {
+      question: "What should AI protect while reducing burden?",
+      options: [
+        "Protect primary endpoint and essential safety monitoring",
+        "Protect primary and key secondary endpoints",
+        "Prioritize lowest-burden pragmatic follow-up",
+        "Remove only clearly low-value optional assessments",
+      ],
+      originalRequest: request,
+    }
+  }
+
+  if (/split|two tables|2 tables/.test(normalized) && !/follow-up|follow up|core|earlier|later|arm|cohort|dosing/.test(normalized)) {
+    return {
+      question: "How should the SoA be split?",
+      options: [
+        "Core treatment schedule vs follow-up schedule",
+        "Earlier visits vs later visits",
+        "Dosing-specific table plus common assessments",
+        "Let AI choose the clearest split",
+      ],
+      originalRequest: request,
+    }
+  }
+
+  if (
+    /arm|cohort|dosing|dose|drug/.test(normalized) &&
+    !/separate|conditional|common|dosing table|shared|different/.test(normalized)
+  ) {
+    return {
+      question: "How should arm, cohort, or dosing differences be represented?",
+      options: [
+        "Use one common SoA with conditional rows",
+        "Separate treatment administration by arm/cohort",
+        "Use separate SoA sections by arm/cohort",
+        "Let AI choose the simplest readable structure",
+      ],
+      originalRequest: request,
+    }
+  }
+
+  if (normalized.split(/\s+/).length <= 3 && /add|change|update|fix|adjust|revise/.test(normalized)) {
+    return {
+      question: "What kind of SoA change should AI make?",
+      options: [
+        "Add or adjust visit timing",
+        "Add or adjust an assessment",
+        "Reduce burden while protecting endpoints",
+        "Improve display/readability only",
+      ],
+      originalRequest: request,
+    }
+  }
+
+  return null
 }
 
 function getScheduleStructureOption(mode: ScheduleStructureMode) {
@@ -8797,6 +9060,9 @@ export default function StudySynopsisStudio() {
   const [literature, setLiterature] = useState<LiteratureForm>(initialLiteratureForm)
   const [schedule, setSchedule] = useState<ScheduleForm>(initialScheduleForm)
   const [scheduleInsights, setScheduleInsights] = useState<ScheduleInsights>(initialScheduleInsights)
+  const [scheduleLayoutRecommendation, setScheduleLayoutRecommendation] = useState<ScheduleLayoutRecommendation>(
+    initialScheduleLayoutRecommendation,
+  )
   const [sections, setSections] = useState<SynopsisSection[]>(buildDefaultSections)
   const [finalSections, setFinalSections] = useState<FinalSection[]>([])
   const [reviews, setReviews] = useState<ReviewState>(initialReviews)
@@ -8819,7 +9085,20 @@ export default function StudySynopsisStudio() {
     emptyPopulationSuggestionSelection,
   )
   const [loadingAction, setLoadingAction] = useState<
-    null | "import" | "schema" | "extract" | "objectives" | "endpoints" | "population" | "impact" | "literature" | "schedule" | "schedule_analysis" | "sections" | "final"
+    | null
+    | "import"
+    | "schema"
+    | "extract"
+    | "objectives"
+    | "endpoints"
+    | "population"
+    | "impact"
+    | "literature"
+    | "schedule"
+    | "schedule_analysis"
+    | "schedule_layout"
+    | "sections"
+    | "final"
   >(null)
   const [apiError, setApiError] = useState("")
   const [apiNotice, setApiNotice] = useState("")
@@ -8837,14 +9116,68 @@ export default function StudySynopsisStudio() {
   const [openProtocolGuardrailModal, setOpenProtocolGuardrailModal] = useState(false)
   const [openImpactAssessmentModal, setOpenImpactAssessmentModal] = useState(false)
   const [openScheduleInsightsModal, setOpenScheduleInsightsModal] = useState(false)
+  const [openScheduleLayoutRecommendationModal, setOpenScheduleLayoutRecommendationModal] = useState(false)
   const [scheduleInsightsModalMode, setScheduleInsightsModalMode] = useState<ScheduleInsightMode>("complexity")
   const [runningScheduleInsightMode, setRunningScheduleInsightMode] = useState<ScheduleInsightMode | null>(null)
   const [openScheduleRegenerationModal, setOpenScheduleRegenerationModal] = useState(false)
+  const [openScheduleColumnModal, setOpenScheduleColumnModal] = useState(false)
+  const [scheduleColumnDraft, setScheduleColumnDraft] = useState<ScheduleColumnDraft>(emptyScheduleColumnDraft)
+  const [scheduleClarificationRequest, setScheduleClarificationRequest] = useState<ScheduleClarificationRequest | null>(null)
   const [populationSuggestionSource, setPopulationSuggestionSource] = useState<PopulationSuggestionSource>("population")
   const [studyTypeReviewNotice, setStudyTypeReviewNotice] = useState<StudyTypeReviewNotice | null>(null)
 
   const clearScheduleInsights = () => {
     setScheduleInsights(initialScheduleInsights)
+  }
+
+  const clearScheduleLayoutRecommendation = () => {
+    setScheduleLayoutRecommendation(initialScheduleLayoutRecommendation)
+  }
+
+  const handleRecommendScheduleLayout = async () => {
+    if (!scheduleReady) {
+      setApiError(`Complete Schedule of Activities first: ${scheduleBlocking.join(", ")}.`)
+      return
+    }
+
+    setLoadingAction("schedule_layout")
+
+    try {
+      const result = await callOpenAI<Omit<ScheduleLayoutRecommendation, "generatedAt" | "provenance">>({
+        action: "recommend_schedule_layout",
+        study,
+        schedule,
+      })
+
+      setScheduleLayoutRecommendation(
+        normalizeScheduleLayoutRecommendation({
+          ...result,
+          generatedAt: new Date().toISOString(),
+          provenance: "ai_generated",
+        }),
+      )
+      setOpenScheduleLayoutRecommendationModal(true)
+    } catch (error) {
+      setScheduleLayoutRecommendation(buildScheduleLayoutRecommendation(schedule))
+      setOpenScheduleLayoutRecommendationModal(true)
+      setApiNotice(
+        `OpenAI layout recommendation failed, so the app used a local SoA layout recommendation instead. ${
+          error instanceof Error ? error.message : "Unable to recommend a schedule layout."
+        }`,
+      )
+    } finally {
+      setLoadingAction(null)
+    }
+  }
+
+  const applyScheduleLayoutRecommendation = () => {
+    if (!scheduleLayoutRecommendation.recommendedLayout || scheduleLayoutRecommendation.provenance === "empty") {
+      return
+    }
+
+    updateScheduleMeta("tableLayout", scheduleLayoutRecommendation.recommendedLayout)
+    setOpenScheduleLayoutRecommendationModal(false)
+    setApiNotice("Applied the recommended SoA display layout. The underlying schedule content was not changed.")
   }
 
   const clearSampleSizeEstimate = () => {
@@ -8911,6 +9244,8 @@ export default function StudySynopsisStudio() {
     setScheduleInsightsModalMode("complexity")
     setRunningScheduleInsightMode(null)
     setOpenScheduleRegenerationModal(false)
+    setOpenScheduleColumnModal(false)
+    setScheduleColumnDraft(emptyScheduleColumnDraft)
     setPopulationSuggestionSource("population")
     setApiError("")
     setApiNotice("")
@@ -9201,6 +9536,10 @@ export default function StudySynopsisStudio() {
   >
   const scheduleTablePresentation = getScheduleTablePresentation(schedule)
   const canSplitScheduleTable = schedule.columns.length >= 4
+  const scheduleColumnAnchor = getScheduleAnchorColumn(schedule, scheduleColumnDraft.anchorColumnId)
+  const canAddScheduleColumn = Boolean(
+    scheduleColumnDraft.phase.trim() && scheduleColumnDraft.period.trim() && scheduleColumnDraft.visit.trim(),
+  )
   const resolvedScheduleStructureMode = getResolvedScheduleStructureMode(study, schedule)
   const resolvedScheduleStructureOption = getScheduleStructureOption(resolvedScheduleStructureMode)
   const studySchemaFingerprint = buildStudySchemaFingerprint(study)
@@ -9704,8 +10043,9 @@ export default function StudySynopsisStudio() {
   }
 
   const updateScheduleMeta = <K extends keyof ScheduleForm>(key: K, value: ScheduleForm[K]) => {
+    const editingContent = key !== "iterationPrompt" && key !== "tableLayout"
+
     setSchedule((current) => {
-      const editingContent = key !== "iterationPrompt"
       return {
         ...current,
         [key]: value,
@@ -9720,8 +10060,11 @@ export default function StudySynopsisStudio() {
     })
     setFinalSections([])
     clearScheduleInsights()
+    if (key !== "iterationPrompt" && key !== "tableLayout") {
+      clearScheduleLayoutRecommendation()
+    }
     setApiNotice("")
-    if (key !== "iterationPrompt") {
+    if (editingContent) {
       setReviews((current) => ({
         ...current,
         schedule: { ...current.schedule, status: "pending", reviewedAt: "" },
@@ -9739,6 +10082,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -9763,6 +10107,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -9780,6 +10125,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -9797,6 +10143,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -9804,20 +10151,44 @@ export default function StudySynopsisStudio() {
     }))
   }
 
+  const openAddScheduleColumnModal = () => {
+    setScheduleColumnDraft(buildScheduleColumnDraft(schedule))
+    setOpenScheduleColumnModal(true)
+  }
+
+  const updateScheduleColumnDraftMode = (mode: ScheduleColumnAddMode) => {
+    setScheduleColumnDraft((current) => buildScheduleColumnDraft(schedule, mode, current.anchorColumnId, current))
+  }
+
+  const updateScheduleColumnDraftAnchor = (anchorColumnId: string) => {
+    setScheduleColumnDraft((current) => buildScheduleColumnDraft(schedule, current.mode, anchorColumnId, current))
+  }
+
   const handleAddScheduleColumn = () => {
+    const phase = scheduleColumnDraft.phase.trim()
+    const period = scheduleColumnDraft.period.trim()
+    const visit = scheduleColumnDraft.visit.trim()
+
+    if (!phase || !period || !visit) {
+      return
+    }
+
     setSchedule((current) => {
-      const lastColumn = current.columns[current.columns.length - 1]
+      const anchorIndex = current.columns.findIndex((column) => column.id === scheduleColumnDraft.anchorColumnId)
+      const insertIndex = anchorIndex >= 0 ? anchorIndex + 1 : current.columns.length
       const nextColumn: ScheduleColumn = {
         id: `visit-${current.columns.length + 1}-${Math.random().toString(36).slice(2, 6)}`,
-        phase: lastColumn?.phase || "Treatment Phase",
-        period: lastColumn?.period || "New period",
-        visit: "New visit",
-        footnote: "",
+        phase,
+        period,
+        visit,
+        footnote: scheduleColumnDraft.footnote.trim(),
       }
+      const columns = [...current.columns]
+      columns.splice(insertIndex, 0, nextColumn)
 
       return {
         ...current,
-        columns: [...current.columns, nextColumn],
+        columns,
         rows: current.rows.map((row) => ({
           ...row,
           cells: { ...row.cells, [nextColumn.id]: "" },
@@ -9827,8 +10198,11 @@ export default function StudySynopsisStudio() {
         sourceFingerprint: studySchemaFingerprint,
       }
     })
+    setOpenScheduleColumnModal(false)
+    setScheduleColumnDraft(emptyScheduleColumnDraft)
     setFinalSections([])
     clearScheduleInsights()
+    clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -11096,7 +11470,7 @@ export default function StudySynopsisStudio() {
     }
   }
 
-  const handleGenerateSchedule = async () => {
+  const handleGenerateSchedule = async (iterationPromptOverride?: string) => {
     if (!showScheduleTab) {
       setApiError(getScheduleEligibilityLabel(study))
       return
@@ -11111,6 +11485,8 @@ export default function StudySynopsisStudio() {
       return
     }
 
+    const scheduleForGeneration =
+      iterationPromptOverride !== undefined ? { ...schedule, iterationPrompt: iterationPromptOverride } : schedule
     const derivedPico = pico.population || pico.intervention || pico.outcomes ? pico : buildPicoFromStudy(study)
     const derivedStats = stats.endpointType ? stats : buildStatsFromStudy(study, derivedPico)
     const derivedLiterature = workflowOptions.useLiterature
@@ -11118,7 +11494,7 @@ export default function StudySynopsisStudio() {
         ? literature
         : buildLiteratureFromState(study, derivedPico)
       : buildSkippedLiteraturePlan(study, derivedPico)
-    const compiledPrompt = buildSchedulePromptFromState(study, derivedPico, derivedStats, derivedLiterature, schedule)
+    const compiledPrompt = buildSchedulePromptFromState(study, derivedPico, derivedStats, derivedLiterature, scheduleForGeneration)
 
     setLoadingAction("schedule")
 
@@ -11135,8 +11511,8 @@ export default function StudySynopsisStudio() {
         stats: derivedStats,
         literature: derivedLiterature,
         schedulePrompt: compiledPrompt,
-        iterationPrompt: schedule.iterationPrompt,
-        schedule,
+        iterationPrompt: scheduleForGeneration.iterationPrompt,
+        schedule: scheduleForGeneration,
       })
 
       setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
@@ -11145,10 +11521,10 @@ export default function StudySynopsisStudio() {
       setSchedule(
         normalizeSchedule({
           ...result,
-          prompt: schedule.prompt || DEFAULT_SCHEDULE_PROMPT,
-          iterationPrompt: schedule.iterationPrompt,
-          tableLayout: schedule.tableLayout,
-          structureMode: schedule.structureMode,
+          prompt: scheduleForGeneration.prompt || DEFAULT_SCHEDULE_PROMPT,
+          iterationPrompt: scheduleForGeneration.iterationPrompt,
+          tableLayout: scheduleForGeneration.tableLayout,
+          structureMode: scheduleForGeneration.structureMode,
           generatedAt: new Date().toISOString(),
           provenance: "ai_generated",
           manualEdited: false,
@@ -11167,10 +11543,10 @@ export default function StudySynopsisStudio() {
       setLiterature({ ...derivedLiterature, sourceFingerprint: studySchemaFingerprint })
       setSchedule(
         buildScheduleFromState(study, derivedPico, derivedStats, derivedLiterature, {
-          prompt: schedule.prompt || DEFAULT_SCHEDULE_PROMPT,
-          iterationPrompt: schedule.iterationPrompt,
-          tableLayout: schedule.tableLayout,
-          structureMode: schedule.structureMode,
+          prompt: scheduleForGeneration.prompt || DEFAULT_SCHEDULE_PROMPT,
+          iterationPrompt: scheduleForGeneration.iterationPrompt,
+          tableLayout: scheduleForGeneration.tableLayout,
+          structureMode: scheduleForGeneration.structureMode,
         }),
       )
       clearScheduleInsights()
@@ -11186,8 +11562,29 @@ export default function StudySynopsisStudio() {
       setActiveTab("schedule")
     } finally {
       setOpenScheduleRegenerationModal(false)
+      setScheduleClarificationRequest(null)
       setLoadingAction(null)
     }
+  }
+
+  const handleRegenerateScheduleRequest = () => {
+    const request = schedule.iterationPrompt.trim()
+    const clarification = buildScheduleRegenerationClarification(request)
+
+    if (clarification) {
+      setScheduleClarificationRequest(clarification)
+      return
+    }
+
+    handleGenerateSchedule()
+  }
+
+  const applyScheduleClarification = (clarification: string) => {
+    if (!scheduleClarificationRequest) return
+
+    const clarifiedRequest = `${scheduleClarificationRequest.originalRequest.trim()}\nClarification: ${clarification}`
+    updateScheduleMeta("iterationPrompt", clarifiedRequest)
+    handleGenerateSchedule(clarifiedRequest)
   }
 
   const handleAnalyzeScheduleInsights = async (focus: "complexity" | "tradeoff") => {
@@ -13557,7 +13954,7 @@ export default function StudySynopsisStudio() {
                     Add activity row
                   </button>
                   <button
-                    onClick={handleAddScheduleColumn}
+                    onClick={openAddScheduleColumnModal}
                     disabled={!schedule.columns.length}
                     className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-amber-300 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -13580,7 +13977,7 @@ export default function StudySynopsisStudio() {
                     {loadingAction === "schedule"
                       ? "Generating schedule..."
                       : schedule.rows.length
-                        ? "Regenerate with change request"
+                        ? "Regenerate SoA with selected structure"
                         : "Generate schedule"}
                   </button>
                   <button
@@ -13606,13 +14003,16 @@ export default function StudySynopsisStudio() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1864AB]">
-                      SoA structure
-                      <InfoTooltip content="Keep this on Auto unless the study has different drugs, dosing schedules, cohorts, regions, or substudies. The app will still generate one editable SoA view." />
+                      AI generation structure
+                      <InfoTooltip content="This setting is used when you generate or regenerate the SoA. It does not immediately transform the current table. Keep Auto unless the study has different drugs, dosing schedules, cohorts, regions, or substudies." />
                     </p>
-                    <h3 className="mt-2 text-lg font-semibold text-slate-950">Choose how arm, cohort, or dosing differences should appear</h3>
+                    <h3 className="mt-2 text-lg font-semibold text-slate-950">Choose how AI should structure the next SoA</h3>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                      Applies when you generate or regenerate the SoA. Changing this selection will not change the current table until you regenerate.
+                    </p>
                   </div>
                   <span className="rounded-full border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-[#1864AB]">
-                    Using: {resolvedScheduleStructureOption.label}
+                    Next generation: {resolvedScheduleStructureOption.label}
                   </span>
                 </div>
 
@@ -13639,42 +14039,63 @@ export default function StudySynopsisStudio() {
                     )
                   })}
                 </div>
+
+                {schedule.rows.length > 0 && (
+                  <div className="mt-4 rounded-[18px] border border-sky-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700">
+                    If you changed the AI generation structure, click{" "}
+                    <span className="font-semibold text-slate-950">Regenerate SoA with selected structure</span> to apply it. The table below is unchanged until regeneration.
+                  </div>
+                )}
               </div>
 
               <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Table layout
-                      <InfoTooltip content={scheduleTablePresentation.recommendation} />
+                      Display layout
+                      <InfoTooltip content={`This only changes how the existing SoA table is displayed on screen. It does not ask AI to regenerate content. ${scheduleTablePresentation.recommendation}`} />
                     </p>
                     <h3 className="mt-2 text-lg font-semibold text-slate-950">Single table by default, split only when it helps readability</h3>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                      Display-only control for the current table. Use it to reduce horizontal scrolling without changing generated SoA logic.
+                    </p>
                   </div>
 
-                  <div className="inline-flex rounded-full border border-slate-200 bg-white p-1">
-                    {[
-                      { value: "auto", label: "Auto" },
-                      { value: "single", label: "Single table" },
-                      { value: "split", label: "Split into 2" },
-                    ].map((option) => {
-                      const selected = schedule.tableLayout === option.value
-                      const disabled = option.value === "split" && !canSplitScheduleTable
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={handleRecommendScheduleLayout}
+                      disabled={loadingAction !== null || !scheduleReady}
+                      className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#1864AB] transition hover:border-sky-300 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {loadingAction === "schedule_layout" ? "Reviewing layout..." : "AI recommend layout"}
+                    </button>
 
-                      return (
-                        <button
-                          key={option.value}
-                          onClick={() => updateScheduleMeta("tableLayout", option.value as ScheduleTableLayout)}
-                          disabled={disabled}
-                          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                            selected
-                              ? "bg-slate-950 text-white"
-                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                          } disabled:cursor-not-allowed disabled:opacity-40`}
-                        >
-                          {option.label}
-                        </button>
-                      )
-                    })}
+                    <div className="inline-flex rounded-full border border-slate-200 bg-white p-1">
+                      {[
+                        { value: "auto", label: "Auto" },
+                        { value: "single", label: "Single table" },
+                        { value: "split", label: "Split into 2" },
+                      ].map((option) => {
+                        const selected = schedule.tableLayout === option.value
+                        const disabled = option.value === "split" && !canSplitScheduleTable
+
+                        return (
+                          <button
+                            key={option.value}
+                            onClick={() => updateScheduleMeta("tableLayout", option.value as ScheduleTableLayout)}
+                            disabled={disabled}
+                            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                              selected
+                                ? "bg-slate-950 text-white"
+                                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            } disabled:cursor-not-allowed disabled:opacity-40`}
+                          >
+                            {option.label}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -13683,6 +14104,14 @@ export default function StudySynopsisStudio() {
                     ? `Auto is currently using ${scheduleTablePresentation.effectiveLayout === "split" ? "split-table" : "single-table"} view.`
                     : `Manual layout override: ${schedule.tableLayout === "split" ? "split-table" : "single-table"} view.`}
                 </div>
+                {scheduleLayoutRecommendation.provenance !== "empty" && (
+                  <button
+                    onClick={() => setOpenScheduleLayoutRecommendationModal(true)}
+                    className="mt-3 text-xs font-semibold text-[#1864AB] underline-offset-4 hover:underline"
+                  >
+                    View last layout recommendation
+                  </button>
+                )}
               </div>
 
               <div className="mt-5 space-y-5">
@@ -13973,12 +14402,251 @@ export default function StudySynopsisStudio() {
       </OverlayModal>
 
       <OverlayModal
+        open={openScheduleLayoutRecommendationModal}
+        eyebrow="SoA display layout"
+        title="AI layout recommendation"
+        description="Use this to decide whether the current SoA is easier to review as one table or split into two display tables. Applying it does not change SoA content."
+        onClose={() => setOpenScheduleLayoutRecommendationModal(false)}
+      >
+        <div className="space-y-4">
+          <section className="rounded-[22px] border border-sky-200 bg-sky-50 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1864AB]">Recommendation</p>
+                <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                  {scheduleLayoutRecommendation.recommendedLayout === "split"
+                    ? "Split into 2 display tables"
+                    : scheduleLayoutRecommendation.recommendedLayout === "single"
+                      ? "Keep as a single table"
+                      : "Use automatic layout"}
+                </h3>
+              </div>
+              <span className="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#1864AB]">
+                {scheduleLayoutRecommendation.provenance === "ai_generated" ? "AI generated" : "Local recommendation"}
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-700">{scheduleLayoutRecommendation.summary}</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{scheduleLayoutRecommendation.rationale}</p>
+            {scheduleLayoutRecommendation.splitPoint && (
+              <p className="mt-3 rounded-2xl border border-white bg-white px-4 py-3 text-sm font-semibold text-slate-800">
+                Split point: {scheduleLayoutRecommendation.splitPoint}
+              </p>
+            )}
+          </section>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <section className="rounded-[22px] border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800">Benefits</p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-emerald-950">
+                {(scheduleLayoutRecommendation.benefits.length
+                  ? scheduleLayoutRecommendation.benefits
+                  : ["Improves reviewability without changing SoA content."]
+                ).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </section>
+
+            <section className="rounded-[22px] border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">Cautions</p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-amber-950">
+                {(scheduleLayoutRecommendation.cautions.length
+                  ? scheduleLayoutRecommendation.cautions
+                  : ["This is a display-only decision. It does not alter the underlying SoA."]
+                ).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </section>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+            <p className="text-xs text-slate-500">
+              {scheduleLayoutRecommendation.generatedAt
+                ? `Generated ${formatTimestamp(scheduleLayoutRecommendation.generatedAt)}.`
+                : "No layout recommendation has been generated yet."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setOpenScheduleLayoutRecommendationModal(false)}
+                className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+              >
+                Close
+              </button>
+              <button
+                onClick={applyScheduleLayoutRecommendation}
+                disabled={scheduleLayoutRecommendation.provenance === "empty"}
+                className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Apply layout
+              </button>
+            </div>
+          </div>
+        </div>
+      </OverlayModal>
+
+      <OverlayModal
+        open={openScheduleColumnModal}
+        eyebrow="SoA visit column"
+        title="Add a visit column"
+        description="Choose whether the new visit belongs to the selected period, starts a new period, or starts a new phase."
+        onClose={() => {
+          setOpenScheduleColumnModal(false)
+          setScheduleColumnDraft(emptyScheduleColumnDraft)
+        }}
+      >
+        <div className="space-y-5">
+          <div className="grid gap-3 md:grid-cols-3">
+            {[
+              {
+                mode: "same_period" as const,
+                title: "Same period",
+                detail: "Add another visit under the selected phase and period.",
+              },
+              {
+                mode: "new_period" as const,
+                title: "New period",
+                detail: "Create a new period under the selected phase.",
+              },
+              {
+                mode: "new_phase" as const,
+                title: "New phase",
+                detail: "Create a new phase with its own period.",
+              },
+            ].map((option) => {
+              const selected = scheduleColumnDraft.mode === option.mode
+
+              return (
+                <button
+                  key={option.mode}
+                  type="button"
+                  onClick={() => updateScheduleColumnDraftMode(option.mode)}
+                  className={`rounded-[22px] border p-4 text-left transition ${
+                    selected ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-amber-300 hover:bg-amber-50"
+                  }`}
+                >
+                  <span className="text-sm font-semibold">{option.title}</span>
+                  <span className={`mt-2 block text-xs leading-5 ${selected ? "text-slate-200" : "text-slate-500"}`}>
+                    {option.detail}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Place after</span>
+              <select
+                value={scheduleColumnDraft.anchorColumnId}
+                onChange={(event) => updateScheduleColumnDraftAnchor(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+              >
+                {schedule.columns.map((column) => (
+                  <option key={column.id} value={column.id}>
+                    {[column.phase, column.period, column.visit].filter(Boolean).join(" / ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Visit</span>
+              <input
+                value={scheduleColumnDraft.visit}
+                onChange={(event) => setScheduleColumnDraft((current) => ({ ...current, visit: event.target.value }))}
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Study phase</span>
+              <input
+                value={scheduleColumnDraft.phase}
+                onChange={(event) => setScheduleColumnDraft((current) => ({ ...current, phase: event.target.value }))}
+                disabled={scheduleColumnDraft.mode !== "new_phase"}
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200 disabled:bg-slate-50 disabled:text-slate-500"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Period within phase</span>
+              <input
+                value={scheduleColumnDraft.period}
+                onChange={(event) => setScheduleColumnDraft((current) => ({ ...current, period: event.target.value }))}
+                disabled={scheduleColumnDraft.mode === "same_period"}
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200 disabled:bg-slate-50 disabled:text-slate-500"
+              />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Footnote</span>
+            <input
+              value={scheduleColumnDraft.footnote}
+              onChange={(event) => setScheduleColumnDraft((current) => ({ ...current, footnote: event.target.value }))}
+              placeholder="Optional"
+              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+            />
+          </label>
+
+          {scheduleColumnAnchor && (
+            <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+              New column will be inserted after{" "}
+              <span className="font-semibold text-slate-900">
+                {[scheduleColumnAnchor.phase, scheduleColumnAnchor.period, scheduleColumnAnchor.visit].filter(Boolean).join(" / ")}
+              </span>
+              .
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4">
+            <button
+              onClick={() => {
+                setOpenScheduleColumnModal(false)
+                setScheduleColumnDraft(emptyScheduleColumnDraft)
+              }}
+              className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddScheduleColumn}
+              disabled={!canAddScheduleColumn}
+              className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Plus className="h-4 w-4" />
+              Add visit column
+            </button>
+          </div>
+        </div>
+      </OverlayModal>
+
+      <OverlayModal
         open={openScheduleRegenerationModal}
         eyebrow="Schedule regeneration"
         title="Tell AI what should change"
-        description="Use this only when the existing SoA needs a specific revision. Leave it blank to regenerate from the current study inputs."
+        description="Use this when the existing SoA needs a specific revision or when you changed the AI generation structure. Leave the change request blank to regenerate from the current study inputs."
         onClose={() => setOpenScheduleRegenerationModal(false)}
       >
+        <div className="mb-5 rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Quick change examples</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {QUICK_SCHEDULE_REGENERATION_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => updateScheduleMeta("iterationPrompt", prompt)}
+                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-[#1864AB]"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            Choose one or type your own request. If the request is too broad, the app will ask a clarification question before regenerating.
+          </p>
+        </div>
         <TextAreaField
           label="Change request for regenerated schedule"
           value={schedule.iterationPrompt}
@@ -13988,7 +14656,7 @@ export default function StudySynopsisStudio() {
         />
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm leading-6 text-slate-600">
-            The regenerated SoA will use the current study design, PICO/statistics, optional literature inputs if enabled, and this change request.
+            The regenerated SoA will use the selected AI generation structure, current study design, PICO/statistics, optional literature inputs if enabled, and this change request.
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -13998,12 +14666,49 @@ export default function StudySynopsisStudio() {
               Cancel
             </button>
             <button
-              onClick={handleGenerateSchedule}
+              onClick={handleRegenerateScheduleRequest}
               disabled={loadingAction !== null || !gates.schedule}
               className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Sparkles className="h-4 w-4" />
-              {loadingAction === "schedule" ? "Regenerating..." : "Regenerate SoA"}
+              {loadingAction === "schedule" ? "Regenerating..." : "Regenerate SoA using selected structure"}
+            </button>
+          </div>
+        </div>
+      </OverlayModal>
+
+      <OverlayModal
+        open={Boolean(scheduleClarificationRequest)}
+        eyebrow="Clarify SoA change"
+        title={scheduleClarificationRequest?.question || "Clarify the SoA change"}
+        description="The request is broad enough that applying it without clarification could change the wrong visits or assessments. Choose the closest intent, or go back and edit the request."
+        onClose={() => setScheduleClarificationRequest(null)}
+      >
+        <div className="space-y-3">
+          <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Original request</p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{scheduleClarificationRequest?.originalRequest}</p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {(scheduleClarificationRequest?.options || []).map((option) => (
+              <button
+                key={option}
+                onClick={() => applyScheduleClarification(option)}
+                disabled={loadingAction !== null}
+                className="rounded-[18px] border border-sky-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-800 transition hover:border-[#1864AB] hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
+            <button
+              onClick={() => setScheduleClarificationRequest(null)}
+              className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+            >
+              Edit request
             </button>
           </div>
         </div>

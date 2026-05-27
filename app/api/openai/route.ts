@@ -294,6 +294,11 @@ const requestSchema = z.discriminatedUnion("action", [
     focus: stringField,
   }),
   z.object({
+    action: z.literal("recommend_schedule_layout"),
+    study: studySchema,
+    schedule: scheduleSchema,
+  }),
+  z.object({
     action: z.literal("draft_sections"),
     study: studySchema,
     pico: picoSchema.partial().optional(),
@@ -367,6 +372,16 @@ const scheduleTradeoffSchema = z.object({
 const scheduleInsightsResultSchema = z.object({
   complexity: scheduleComplexitySchema,
   tradeoff: scheduleTradeoffSchema,
+})
+
+const scheduleLayoutRecommendationResultSchema = z.object({
+  recommendedLayout: z.enum(["auto", "single", "split"]),
+  splitStrategy: z.enum(["single", "core_follow_up", "balanced", "manual_review"]),
+  splitPoint: z.string(),
+  summary: z.string(),
+  rationale: z.string(),
+  benefits: z.array(z.string()),
+  cautions: z.array(z.string()),
 })
 
 const draftSectionsResultSchema = z.object({
@@ -1019,6 +1034,19 @@ function scheduleInsightsPrompt() {
   ].join("\n")
 }
 
+function scheduleLayoutPrompt() {
+  return [
+    "You are a clinical operations and protocol-design reviewer recommending how to display an existing Schedule of Activities table.",
+    "Do not rewrite the SoA and do not add or remove visits, rows, activities, assessments, or cells.",
+    "Recommend only the display layout: single table, split into two tables, or auto.",
+    "Prefer a single table when the visit grid is still readable.",
+    "Recommend split when horizontal scanning is likely to impair review, especially when there is a distinct follow-up phase or many visit columns.",
+    "If splitting, identify whether the best split is core schedule vs follow-up, or a balanced earlier/later visit split.",
+    "Explain the split point in practical language. Mention that this is display-only and does not create separate protocol SoAs.",
+    "Be concise and decision-oriented.",
+  ].join("\n")
+}
+
 export async function POST(request: Request) {
   try {
     const body = requestSchema.parse(await request.json())
@@ -1227,6 +1255,19 @@ export async function POST(request: Request) {
         payload: body,
         effort: "medium",
         maxOutputTokens: 9000,
+      })
+
+      return Response.json(result)
+    }
+
+    if (body.action === "recommend_schedule_layout") {
+      const result = await parseStructuredOutput({
+        schema: scheduleLayoutRecommendationResultSchema,
+        schemaName: "schedule_layout_recommendation",
+        systemPrompt: scheduleLayoutPrompt(),
+        payload: body,
+        effort: "low",
+        maxOutputTokens: 3000,
       })
 
       return Response.json(result)
