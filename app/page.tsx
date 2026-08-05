@@ -15,6 +15,7 @@ import {
   Microscope,
   Pencil,
   Plus,
+  RefreshCw,
   Scale,
   Sparkles,
   Target,
@@ -176,6 +177,94 @@ const EVIDENCE_USE_INTENTS = [
   "Safety / risk management",
 ] as const
 
+const PRIMARY_DECISION_OPTIONS = [
+  {
+    value: "treatment_choice",
+    label: "Inform clinical practice",
+    description: "Treatment choice, treatment placement, or another change in routine care.",
+    strategic: "Inform clinical practice",
+    evidence: "Guideline / practice informing",
+    legacyAim: "Inform guidelines or clinical practice",
+  },
+  {
+    value: "patient_selection",
+    label: "Patient selection",
+    description: "Determine which patient population is most appropriate for the intervention or strategy.",
+    strategic: "Explore new population",
+    evidence: "Guideline / practice informing",
+    legacyAim: "Explore a new population or treatment strategy",
+  },
+  {
+    value: "treatment_sequencing",
+    label: "Treatment sequencing",
+    description: "Determine where an intervention belongs relative to prior, alternative, or subsequent therapies.",
+    strategic: "Inform clinical practice",
+    evidence: "Guideline / practice informing",
+    legacyAim: "Inform guidelines or clinical practice",
+  },
+  {
+    value: "dose_regimen",
+    label: "Dose or regimen",
+    description: "Determine the dose, schedule, duration, or modification strategy that best preserves benefit-risk.",
+    strategic: "Explore dose modification",
+    evidence: "Label support / change",
+    legacyAim: "Support label change or expansion",
+  },
+  {
+    value: "safety_management",
+    label: "Safety-management action",
+    description: "Determine how a material safety risk should be detected, prevented, monitored, or managed.",
+    strategic: "Safety / risk management",
+    evidence: "Safety / risk management",
+    legacyAim: "Strengthen safety or risk-management evidence",
+  },
+  {
+    value: "label_regulatory",
+    label: "Label or regulatory decision",
+    description: "Determine whether evidence supports a claim, indication, population, regimen, or regulatory commitment.",
+    strategic: "Label expansion",
+    evidence: "Label support / change",
+    legacyAim: "Support label change or expansion",
+  },
+  {
+    value: "hta_reimbursement",
+    label: "HTA or reimbursement decision",
+    description: "Determine whether comparative clinical and value evidence supports access or reimbursement.",
+    strategic: "Market access / HTA support",
+    evidence: "HTA / market access",
+    legacyAim: "Support HTA or market access decisions",
+  },
+  {
+    value: "next_development",
+    label: "Next-development or evidence-generation decision",
+    description: "Determine whether and how the intervention, population, or research question should progress.",
+    strategic: "Support lifecycle management",
+    evidence: "",
+    legacyAim: "",
+  },
+  {
+    value: "other",
+    label: "Other defined decision",
+    description: "Name the specific decision category when the study supports another action.",
+    strategic: "",
+    evidence: "",
+    legacyAim: "",
+  },
+] as const
+
+type PrimaryDecisionValue = (typeof PRIMARY_DECISION_OPTIONS)[number]["value"]
+
+const DISSEMINATION_OPTIONS = [
+  "Scientific publication",
+  "Congress presentation",
+  "Medical exchange",
+  "Guideline communication",
+  "HTA dossier",
+  "Regulatory submission",
+] as const
+
+const PLANNED_EVIDENCE_OUTPUTS = DISSEMINATION_OPTIONS.filter((option) => option !== "Scientific publication")
+
 const PRIMARY_STUDY_AIMS = [
   {
     label: "Support label change or expansion",
@@ -217,33 +306,129 @@ const PRIMARY_STUDY_AIMS = [
 type ProtocolGuardrailProfile =
   | "auto"
   | "none"
-  | "practice_informing_ped"
-  | "lean_decision_evidence"
+  | "ped_streamlined"
+
+type StudyEvidenceRole =
+  | ""
+  | "non_label_enabling"
+  | "label_enabling"
+  | "regulatory_commitment"
+  | "hta_requirement"
+  | "uncertain"
+
+type ProtocolGuardrailApplicability =
+  | "applies"
+  | "external_requirements"
+  | "general_complexity"
+  | "none"
 
 type Phase3SafetyAvailability = "" | "yes" | "no" | "unknown"
 
 type ProtocolGuardrailCheckStatus = "aligned" | "needs_justification" | "consider_simplifying"
+type ProtocolGuardrailAlignmentStatus = "aligned" | "partially_aligned" | "not_aligned" | "justified_exception"
+type ProtocolGuardrailRecommendedAction = "keep" | "align" | "simplify" | "remove" | "keep_as_exception"
+
+type ProtocolGuardrailDestination = {
+  label: string
+  tab: TabId
+  sectionId: string
+}
 
 type ProtocolGuardrailCheck = {
   id: string
   label: string
   status: ProtocolGuardrailCheckStatus
+  alignmentStatus?: ProtocolGuardrailAlignmentStatus
+  recommendedAction?: ProtocolGuardrailRecommendedAction
   finding: string
   action: string
+  exceptionPath?: string
+  destinations?: ProtocolGuardrailDestination[]
+}
+
+type ProtocolGuardrailStage = {
+  id: string
+  sequence: number
+  label: string
+  description: string
+  checkIds: string[]
+  status: ProtocolGuardrailCheckStatus
+}
+
+type ProtocolGuardrailTraceItem = {
+  label: string
+  value: string
+  complete: boolean
+}
+
+type ProtocolGuardrailPriorityAction = {
+  lane: "resolve" | "justify" | "simplify"
+  check: ProtocolGuardrailCheck
+}
+
+type ProtocolGuardrailItemRecommendation = "retain" | "align" | "simplify" | "remove"
+type ProtocolGuardrailDesignAssessment =
+  | "core"
+  | "supportive"
+  | "unclear"
+  | "overlap"
+  | "disproportionate"
+  | "multiplicity"
+type ExternalRequirementStatus = "documented" | "mentioned" | "not_provided" | "not_applicable"
+
+type ProtocolGuardrailReconciliationItem = {
+  id: string
+  element: string
+  role: string
+  linkedTo: string
+  recommendation: ProtocolGuardrailItemRecommendation
+  rationale: string
+  destinations: ProtocolGuardrailDestination[]
+}
+
+type ProtocolGuardrailReconciliationGroup = {
+  id: string
+  label: string
+  description: string
+  items: ProtocolGuardrailReconciliationItem[]
+}
+
+type GuardrailEndpointRole = "primary" | "key_secondary" | "secondary" | "exploratory" | "supporting"
+
+type GuardrailEndpointItem = {
+  text: string
+  role: GuardrailEndpointRole
+}
+
+type GuardrailObjectiveItem = {
+  text: string
+  sourceIndex: number
+  partIndex: number
+  compound: boolean
 }
 
 type ProtocolGuardrailAssessment = {
   profile: Exclude<ProtocolGuardrailProfile, "auto">
   label: string
   summary: string
+  applicability: ProtocolGuardrailApplicability
+  applicabilityLabel: string
+  evidenceRoleLabel: string
+  primaryDecisionLabel: string
+  secondaryDecisionLabels: string[]
+  dissemination: string[]
+  trace: ProtocolGuardrailTraceItem[]
+  stages: ProtocolGuardrailStage[]
+  priorityActions: ProtocolGuardrailPriorityAction[]
   checks: ProtocolGuardrailCheck[]
+  reconciliationGroups: ProtocolGuardrailReconciliationGroup[]
 }
 
 const PROTOCOL_GUARDRAIL_OPTIONS: Array<{ value: ProtocolGuardrailProfile; label: string; description: string }> = [
   {
     value: "auto",
     label: "Auto-suggest",
-    description: "Use the study type, stage, and primary aim to decide whether guardrails should apply.",
+    description: "Use the study type, stage, primary decision, and evidence role to determine PED applicability.",
   },
   {
     value: "none",
@@ -251,22 +436,49 @@ const PROTOCOL_GUARDRAIL_OPTIONS: Array<{ value: ProtocolGuardrailProfile; label
     description: "Use standard synopsis drafting without additional protocol-template discipline.",
   },
   {
-    value: "practice_informing_ped",
-    label: "Practice-informing PED guardrails",
-    description: "Lean interventional discipline for studies intended to inform clinical practice or guidelines.",
-  },
-  {
-    value: "lean_decision_evidence",
-    label: "Lean decision-evidence guardrails",
-    description: "A lighter profile for HTA, market-access, publication, or pragmatic evidence generation.",
+    value: "ped_streamlined",
+    label: "PED streamlined-design principles",
+    description: "Focused evidence and operational discipline, applied prescriptively only when the study is confirmed as non-label-enabling.",
   },
 ]
 
 const PROTOCOL_GUARDRAIL_LABELS: Record<Exclude<ProtocolGuardrailProfile, "auto">, string> = {
   none: "No protocol guardrails",
-  practice_informing_ped: "Practice-informing PED guardrails",
-  lean_decision_evidence: "Lean decision-evidence guardrails",
+  ped_streamlined: "PED streamlined-design principles",
 }
+
+const STUDY_EVIDENCE_ROLE_OPTIONS: Array<{ value: StudyEvidenceRole; label: string; description: string }> = [
+  {
+    value: "",
+    label: "Not confirmed",
+    description: "Use a non-prescriptive complexity review until the study role is confirmed.",
+  },
+  {
+    value: "non_label_enabling",
+    label: "Non-label-enabling",
+    description: "PED streamlining recommendations can be applied directly for Phase 2, 3, or 4 studies.",
+  },
+  {
+    value: "label_enabling",
+    label: "Label-enabling / submission-supporting",
+    description: "Review complexity, but confirm regulatory requirements before changing study elements.",
+  },
+  {
+    value: "regulatory_commitment",
+    label: "Regulatory commitment",
+    description: "Review complexity while protecting elements required by the commitment or authority agreement.",
+  },
+  {
+    value: "hta_requirement",
+    label: "HTA / reimbursement evidence requirement",
+    description: "Review proportionality while confirming payer or HTA evidence expectations.",
+  },
+  {
+    value: "uncertain",
+    label: "Uncertain",
+    description: "Do not recommend removal or simplification until external requirements are clarified.",
+  },
+]
 
 const THERAPEUTIC_LIBRARY = {
   Oncology: {
@@ -402,7 +614,14 @@ type StudyForm = {
   subcategory: string
   developmentStage: string
   primaryStudyAim: string
+  primaryDecisionEnabled: PrimaryDecisionValue | ""
+  secondaryDecisionsEnabled: PrimaryDecisionValue[]
+  decisionStatement: string
+  customDecisionEnabled: string
+  evidenceDissemination: string[]
   protocolGuardrailProfile: ProtocolGuardrailProfile
+  studyEvidenceRole: StudyEvidenceRole
+  externalRequirements: string
   phase3SafetyDataAvailable: Phase3SafetyAvailability
   protocolGuardrailNotes: string
   primaryEvidenceUseIntent: string
@@ -493,6 +712,7 @@ type ScheduleRow = {
 
 type ScheduleProvenance = "empty" | "ai_generated" | "local_draft" | "manual" | "hybrid"
 type ScheduleTableLayout = "auto" | "single" | "split"
+type ScheduleNotesMode = "auto" | "show" | "hide"
 type ScheduleStructureMode = "auto" | "common" | "conditional" | "separate_by_arm" | "dosing_plus_common"
 type ScheduleColumnAddMode = "same_period" | "new_period" | "new_phase"
 
@@ -510,6 +730,7 @@ type ScheduleForm = {
   prompt: string
   iterationPrompt: string
   tableLayout: ScheduleTableLayout
+  notesMode: ScheduleNotesMode
   structureMode: ScheduleStructureMode
   columns: ScheduleColumn[]
   rows: ScheduleRow[]
@@ -580,6 +801,74 @@ type ScheduleLayoutRecommendation = {
   rationale: string
   benefits: string[]
   cautions: string[]
+}
+
+type EvidenceCoverageStatus = "strong" | "partial" | "weak" | "missing"
+type EvidenceRequiredFor = "primary" | "secondary" | "exploratory" | "safety" | "heor" | "publication"
+type EvidenceRecommendation = "keep" | "add" | "simplify" | "optional" | "remove"
+type CostImplication = "low" | "medium" | "high" | "very_high" | "depends"
+type CostValueJudgment = "worth_adding" | "only_if_strategic_priority" | "defer" | "avoid_unless_required"
+type ClinicalRelevance = "direct" | "contextual" | "hypothesis_generating"
+type AnalysisReadiness = "decision_ready" | "supportive" | "hypothesis_generating" | "not_ready"
+type DecisionImportance = "high" | "moderate" | "low"
+
+type EvidenceCoverage = {
+  area: string
+  status: EvidenceCoverageStatus
+  rationale: string
+}
+
+type EvidenceMapItem = {
+  id: string
+  dataDomain: string
+  soaRows: string[]
+  requiredFor: EvidenceRequiredFor
+  objectiveLink: string
+  endpointOrEstimand: string
+  clinicalRelevance: ClinicalRelevance
+  clinicalRelevanceRationale: string
+  supportiveEvidenceMessage: string
+  inconclusiveEvidenceRisk: string
+  analysisReadiness: AnalysisReadiness
+  decisionImportance: DecisionImportance
+  decisionUse: string
+  decisionAudience: string[]
+  dataCaptureSource: string
+  keyCollectionTimepoints: string[]
+  minimumDataQuality: string
+  collectionBurden: AnalysisImpact
+  evidenceValue: AnalysisImpact
+  costImplication: CostImplication
+  dataCollectionCost: CostImplication
+  followUpDurationImpact: AnalysisImpact
+  followUpDurationRationale: string
+  costDrivers: string[]
+  costRationale: string
+  costValueJudgment: CostValueJudgment
+  analysesUnlocked: string[]
+  futureOpportunities: string[]
+  ifMissing: string
+  recommendation: EvidenceRecommendation
+}
+
+type EvidenceSimulatorOption = {
+  id: string
+  label: string
+  currentStatus: "included" | "partial" | "missing"
+  collectionBurden: AnalysisImpact
+  evidenceValue: AnalysisImpact
+  analysesUnlocked: string[]
+  tradeoff: string
+}
+
+type EvidenceNavigator = {
+  generatedAt: string
+  provenance: "empty" | "ai_generated" | "local_draft"
+  executiveSummary: string
+  coverage: EvidenceCoverage[]
+  items: EvidenceMapItem[]
+  gaps: string[]
+  simulatorOptions: EvidenceSimulatorOption[]
 }
 
 type ScheduleClarificationRequest = {
@@ -696,6 +985,7 @@ type WorkspaceSnapshot = {
   literature: LiteratureForm
   schedule: ScheduleForm
   scheduleInsights: ScheduleInsights
+  evidenceNavigator: EvidenceNavigator
   sections: SynopsisSection[]
   finalSections: FinalSection[]
   reviews: ReviewState
@@ -908,7 +1198,14 @@ const initialStudyForm: StudyForm = {
   subcategory: "Traditional RCT",
   developmentStage: "",
   primaryStudyAim: "",
+  primaryDecisionEnabled: "",
+  secondaryDecisionsEnabled: [],
+  decisionStatement: "",
+  customDecisionEnabled: "",
+  evidenceDissemination: [],
   protocolGuardrailProfile: "auto",
+  studyEvidenceRole: "",
+  externalRequirements: "",
   phase3SafetyDataAvailable: "",
   protocolGuardrailNotes: "",
   primaryEvidenceUseIntent: "",
@@ -1125,6 +1422,7 @@ const initialScheduleForm: ScheduleForm = {
   prompt: DEFAULT_SCHEDULE_PROMPT,
   iterationPrompt: "",
   tableLayout: "auto",
+  notesMode: "auto",
   structureMode: "auto",
   columns: [],
   rows: [],
@@ -1164,6 +1462,16 @@ const initialScheduleInsights: ScheduleInsights = {
     recommendations: [],
     safeguards: [],
   },
+}
+
+const initialEvidenceNavigator: EvidenceNavigator = {
+  generatedAt: "",
+  provenance: "empty",
+  executiveSummary: "",
+  coverage: [],
+  items: [],
+  gaps: [],
+  simulatorOptions: [],
 }
 
 const initialScheduleLayoutRecommendation: ScheduleLayoutRecommendation = {
@@ -1271,6 +1579,7 @@ function buildEmptyWorkspaceSnapshot(): WorkspaceSnapshot {
     literature: { ...initialLiteratureForm },
     schedule: normalizeSchedule(initialScheduleForm),
     scheduleInsights: normalizeScheduleInsights(initialScheduleInsights),
+    evidenceNavigator: normalizeEvidenceNavigator(initialEvidenceNavigator),
     sections: buildDefaultSections().map((section) => normalizeSection(section)),
     finalSections: [],
     reviews: {
@@ -1308,6 +1617,7 @@ function normalizeWorkspaceSnapshot(snapshot?: Partial<WorkspaceSnapshot>): Work
     literature: { ...baseline.literature, ...(snapshot?.literature || {}) },
     schedule: normalizeSchedule(snapshot?.schedule),
     scheduleInsights: normalizeScheduleInsights(snapshot?.scheduleInsights),
+    evidenceNavigator: normalizeEvidenceNavigator(snapshot?.evidenceNavigator),
     sections: snapshot?.sections?.length ? snapshot.sections.map((section) => normalizeSection(section)) : baseline.sections,
     finalSections: Array.isArray(snapshot?.finalSections) ? snapshot.finalSections : baseline.finalSections,
     reviews: {
@@ -1396,6 +1706,8 @@ const emptyPopulationSuggestionSelection: PopulationSuggestionSelection = {
 }
 
 function normalizeStudyForm(study?: Partial<StudyForm>): StudyForm {
+  const legacyProtocolGuardrailProfile = (study as { protocolGuardrailProfile?: string } | undefined)
+    ?.protocolGuardrailProfile
   const categoryCandidates = Object.keys(STUDY_CATEGORIES)
   const normalizedCategory =
     matchControlledOption(String(study?.category || ""), categoryCandidates) ||
@@ -1408,26 +1720,61 @@ function normalizeStudyForm(study?: Partial<StudyForm>): StudyForm {
     (subcategoryOptions.includes(String(study?.subcategory || "")) ? String(study?.subcategory || "") : "") ||
     subcategoryOptions[0] ||
     initialStudyForm.subcategory
+  const primaryDecisionEnabled = isPrimaryDecisionValue(study?.primaryDecisionEnabled)
+    ? study.primaryDecisionEnabled
+    : inferLegacyPrimaryDecision(study)
+  const secondaryDecisionsEnabled = Array.isArray(study?.secondaryDecisionsEnabled)
+    ? study.secondaryDecisionsEnabled
+        .filter(isPrimaryDecisionValue)
+        .filter((value) => value !== primaryDecisionEnabled)
+        .slice(0, 3)
+    : []
+  const legacyPublicationSelected =
+    /scientific publication|publication strategy/i.test(
+      `${study?.primaryStudyAim || ""} ${study?.primaryEvidenceUseIntent || ""} ${(study?.secondaryEvidenceUseIntents || []).join(" ")}`,
+    )
+  const evidenceDissemination = uniqueItemsCaseInsensitive([
+    ...(Array.isArray(study?.evidenceDissemination) ? study.evidenceDissemination : []),
+    ...(legacyPublicationSelected ? ["Scientific publication"] : []),
+  ]).filter((item) => DISSEMINATION_OPTIONS.includes(item as (typeof DISSEMINATION_OPTIONS)[number]))
 
   return {
     ...initialStudyForm,
     ...study,
     category: normalizedCategory,
     subcategory: normalizedSubcategory,
+    primaryDecisionEnabled,
+    secondaryDecisionsEnabled,
+    decisionStatement: study?.decisionStatement || "",
+    customDecisionEnabled: study?.customDecisionEnabled || "",
+    evidenceDissemination,
+    primaryEvidenceUseIntent:
+      !primaryDecisionEnabled && legacyPublicationSelected ? "" : study?.primaryEvidenceUseIntent || "",
     secondaryEvidenceUseIntents: Array.isArray(study?.secondaryEvidenceUseIntents)
-      ? study.secondaryEvidenceUseIntents
+      ? study.secondaryEvidenceUseIntents.filter((item) => item !== "Scientific publication")
       : [],
     secondaryStrategicObjectives: Array.isArray(study?.secondaryStrategicObjectives)
       ? study.secondaryStrategicObjectives
       : [],
     selectedEndpoints: Array.isArray(study?.selectedEndpoints) ? study.selectedEndpoints : [],
     protocolGuardrailProfile:
-      study?.protocolGuardrailProfile === "none" ||
-      study?.protocolGuardrailProfile === "practice_informing_ped" ||
-      study?.protocolGuardrailProfile === "lean_decision_evidence" ||
-      study?.protocolGuardrailProfile === "auto"
-        ? study.protocolGuardrailProfile
+      legacyProtocolGuardrailProfile === "none" ||
+      legacyProtocolGuardrailProfile === "ped_streamlined" ||
+      legacyProtocolGuardrailProfile === "auto"
+        ? legacyProtocolGuardrailProfile
+        : legacyProtocolGuardrailProfile === "practice_informing_ped" ||
+            legacyProtocolGuardrailProfile === "lean_decision_evidence"
+          ? "ped_streamlined"
         : "auto",
+    studyEvidenceRole:
+      study?.studyEvidenceRole === "non_label_enabling" ||
+      study?.studyEvidenceRole === "label_enabling" ||
+      study?.studyEvidenceRole === "regulatory_commitment" ||
+      study?.studyEvidenceRole === "hta_requirement" ||
+      study?.studyEvidenceRole === "uncertain"
+        ? study.studyEvidenceRole
+        : "",
+    externalRequirements: study?.externalRequirements || "",
     phase3SafetyDataAvailable:
       study?.phase3SafetyDataAvailable === "yes" ||
       study?.phase3SafetyDataAvailable === "no" ||
@@ -1480,6 +1827,10 @@ function normalizeSchedule(schedule?: Partial<ScheduleForm>): ScheduleForm {
     schedule?.tableLayout === "single" || schedule?.tableLayout === "split" || schedule?.tableLayout === "auto"
       ? schedule.tableLayout
       : "auto"
+  const notesMode: ScheduleNotesMode =
+    schedule?.notesMode === "show" || schedule?.notesMode === "hide" || schedule?.notesMode === "auto"
+      ? schedule.notesMode
+      : "auto"
   const structureMode: ScheduleStructureMode =
     schedule?.structureMode === "common" ||
     schedule?.structureMode === "conditional" ||
@@ -1512,6 +1863,7 @@ function normalizeSchedule(schedule?: Partial<ScheduleForm>): ScheduleForm {
     ...schedule,
     prompt: schedule?.prompt || DEFAULT_SCHEDULE_PROMPT,
     tableLayout,
+    notesMode,
     structureMode,
     columns,
     rows: Array.isArray(schedule?.rows)
@@ -1559,6 +1911,128 @@ function normalizeScheduleInsights(insights?: Partial<ScheduleInsights>): Schedu
   }
 }
 
+function normalizeEvidenceNavigator(navigator?: Partial<EvidenceNavigator>): EvidenceNavigator {
+  const validImpact = (value: unknown): value is AnalysisImpact => value === "low" || value === "medium" || value === "high"
+  const validStatus = (value: unknown): value is EvidenceCoverageStatus =>
+    value === "strong" || value === "partial" || value === "weak" || value === "missing"
+  const validRequiredFor = (value: unknown): value is EvidenceRequiredFor =>
+    value === "primary" ||
+    value === "secondary" ||
+    value === "exploratory" ||
+    value === "safety" ||
+    value === "heor" ||
+    value === "publication"
+  const validRecommendation = (value: unknown): value is EvidenceRecommendation =>
+    value === "keep" || value === "add" || value === "simplify" || value === "optional" || value === "remove"
+  const validCost = (value: unknown): value is CostImplication =>
+    value === "low" || value === "medium" || value === "high" || value === "very_high" || value === "depends"
+  const validCostJudgment = (value: unknown): value is CostValueJudgment =>
+    value === "worth_adding" ||
+    value === "only_if_strategic_priority" ||
+    value === "defer" ||
+    value === "avoid_unless_required"
+  const validClinicalRelevance = (value: unknown): value is ClinicalRelevance =>
+    value === "direct" || value === "contextual" || value === "hypothesis_generating"
+  const validAnalysisReadiness = (value: unknown): value is AnalysisReadiness =>
+    value === "decision_ready" || value === "supportive" || value === "hypothesis_generating" || value === "not_ready"
+  const validDecisionImportance = (value: unknown): value is DecisionImportance => value === "high" || value === "moderate" || value === "low"
+
+  return {
+    ...initialEvidenceNavigator,
+    ...navigator,
+    provenance:
+      navigator?.provenance === "ai_generated" || navigator?.provenance === "local_draft" || navigator?.provenance === "empty"
+        ? navigator.provenance
+        : navigator?.generatedAt
+          ? "local_draft"
+          : "empty",
+    coverage: Array.isArray(navigator?.coverage)
+      ? navigator.coverage.map((item) => ({
+          area: item?.area || "Evidence coverage",
+          status: validStatus(item?.status) ? item.status : "partial",
+          rationale: item?.rationale || "",
+        }))
+      : [],
+    items: Array.isArray(navigator?.items)
+      ? navigator.items.map((item, index) => {
+          const requiredFor = validRequiredFor(item?.requiredFor) ? item.requiredFor : "exploratory"
+          const dataDomain = item?.dataDomain || "Data domain"
+          const defaultOutcomeProfile = getDefaultEvidenceOutcomeProfile(dataDomain, requiredFor)
+          const defaultPlanningProfile = getDefaultEvidencePlanningProfile(dataDomain, requiredFor)
+          const defaultCostProfile = getDefaultCostProfile(dataDomain)
+          const hasCostDimensions = validCost(item?.dataCollectionCost) && validImpact(item?.followUpDurationImpact)
+          const decisionImportance = validDecisionImportance(item?.decisionImportance)
+            ? item.decisionImportance
+            : defaultPlanningProfile.decisionImportance
+          const costValueJudgment = validCostJudgment(item?.costValueJudgment)
+            ? item.costValueJudgment
+            : defaultCostProfile.costValueJudgment
+          const requestedRecommendation = validRecommendation(item?.recommendation) ? item.recommendation : "optional"
+          const recommendation =
+            requestedRecommendation === "add" &&
+            (decisionImportance !== "high" || costValueJudgment === "defer" || costValueJudgment === "avoid_unless_required")
+              ? "optional"
+              : requestedRecommendation
+
+          return {
+          ...defaultOutcomeProfile,
+          ...defaultPlanningProfile,
+          ...defaultCostProfile,
+          id: item?.id || `evidence-${index + 1}`,
+          dataDomain,
+          soaRows: Array.isArray(item?.soaRows) ? item.soaRows : [],
+          requiredFor,
+          objectiveLink: item?.objectiveLink || "",
+          endpointOrEstimand: item?.endpointOrEstimand || "",
+          clinicalRelevance: validClinicalRelevance(item?.clinicalRelevance) ? item.clinicalRelevance : defaultOutcomeProfile.clinicalRelevance,
+          clinicalRelevanceRationale: item?.clinicalRelevanceRationale || defaultOutcomeProfile.clinicalRelevanceRationale,
+          supportiveEvidenceMessage: item?.supportiveEvidenceMessage || defaultOutcomeProfile.supportiveEvidenceMessage,
+          inconclusiveEvidenceRisk: item?.inconclusiveEvidenceRisk || defaultOutcomeProfile.inconclusiveEvidenceRisk,
+          analysisReadiness: validAnalysisReadiness(item?.analysisReadiness) ? item.analysisReadiness : defaultPlanningProfile.analysisReadiness,
+          decisionImportance,
+          decisionUse: item?.decisionUse || defaultPlanningProfile.decisionUse,
+          decisionAudience: Array.isArray(item?.decisionAudience) ? item.decisionAudience : defaultPlanningProfile.decisionAudience,
+          dataCaptureSource: item?.dataCaptureSource || defaultPlanningProfile.dataCaptureSource,
+          keyCollectionTimepoints: Array.isArray(item?.keyCollectionTimepoints)
+            ? item.keyCollectionTimepoints
+            : defaultPlanningProfile.keyCollectionTimepoints,
+          minimumDataQuality: item?.minimumDataQuality || defaultPlanningProfile.minimumDataQuality,
+          collectionBurden: validImpact(item?.collectionBurden) ? item.collectionBurden : "medium",
+          evidenceValue: validImpact(item?.evidenceValue) ? item.evidenceValue : "medium",
+          costImplication: hasCostDimensions && validCost(item?.costImplication) ? item.costImplication : defaultCostProfile.costImplication,
+          dataCollectionCost: validCost(item?.dataCollectionCost) ? item.dataCollectionCost : defaultCostProfile.dataCollectionCost,
+          followUpDurationImpact: validImpact(item?.followUpDurationImpact)
+            ? item.followUpDurationImpact
+            : defaultCostProfile.followUpDurationImpact,
+          followUpDurationRationale: item?.followUpDurationRationale || defaultCostProfile.followUpDurationRationale,
+          costDrivers: Array.isArray(item?.costDrivers) ? item.costDrivers : [],
+          costRationale: item?.costRationale || defaultCostProfile.costRationale,
+          costValueJudgment,
+          analysesUnlocked: Array.isArray(item?.analysesUnlocked) ? item.analysesUnlocked : [],
+          futureOpportunities: Array.isArray(item?.futureOpportunities) ? item.futureOpportunities : [],
+          ifMissing: item?.ifMissing || "",
+          recommendation,
+          }
+        })
+      : [],
+    gaps: Array.isArray(navigator?.gaps) ? navigator.gaps : [],
+    simulatorOptions: Array.isArray(navigator?.simulatorOptions)
+      ? navigator.simulatorOptions.map((item, index) => ({
+          id: item?.id || `option-${index + 1}`,
+          label: item?.label || "Evidence option",
+          currentStatus:
+            item?.currentStatus === "included" || item?.currentStatus === "partial" || item?.currentStatus === "missing"
+              ? item.currentStatus
+              : "partial",
+          collectionBurden: validImpact(item?.collectionBurden) ? item.collectionBurden : "medium",
+          evidenceValue: validImpact(item?.evidenceValue) ? item.evidenceValue : "medium",
+          analysesUnlocked: Array.isArray(item?.analysesUnlocked) ? item.analysesUnlocked : [],
+          tradeoff: item?.tradeoff || "",
+        }))
+      : [],
+  }
+}
+
 function normalizeStudyDocumentImportReport(report?: Partial<StudyDocumentImportReport>): StudyDocumentImportReport {
   return {
     ...initialStudyDocumentImportReport,
@@ -1579,6 +2053,23 @@ function normalizeImpactAssessment(assessment?: Partial<ImpactAssessment>): Impa
     domains: Array.isArray(assessment?.domains) ? assessment.domains : [],
     blockers: Array.isArray(assessment?.blockers) ? assessment.blockers : [],
     strengthenActions: Array.isArray(assessment?.strengthenActions) ? assessment.strengthenActions : [],
+  }
+}
+
+function sanitizeImpactAssessmentForExternalRequirements(assessment: ImpactAssessment): ImpactAssessment {
+  const sanitize = (value: string) =>
+    value
+      .replace(/\bPED streamlined-design principles\b/gi, "streamlined-design principles")
+      .replace(/\bPED guardrails?\b/gi, "design-complexity checks")
+      .replace(/\bPED applicability\b/gi, "assessment applicability")
+      .replace(/\bPED\b/gi, "design-complexity")
+
+  return {
+    ...assessment,
+    executiveSummary: sanitize(assessment.executiveSummary),
+    domains: assessment.domains.map((domain) => ({ ...domain, rationale: sanitize(domain.rationale) })),
+    blockers: assessment.blockers.map(sanitize),
+    strengthenActions: assessment.strengthenActions.map(sanitize),
   }
 }
 
@@ -1966,6 +2457,20 @@ function buildScheduleLayoutRecommendation(schedule: ScheduleForm): ScheduleLayo
   }
 }
 
+function hasScheduleNotes(schedule: ScheduleForm) {
+  return schedule.rows.some((row) => row.notes.trim().length > 0)
+}
+
+function shouldShowScheduleNotes(schedule: ScheduleForm) {
+  if (schedule.notesMode === "show") {
+    return true
+  }
+  if (schedule.notesMode === "hide") {
+    return false
+  }
+  return hasScheduleNotes(schedule)
+}
+
 function normalizeScheduleLayoutRecommendation(
   recommendation?: Partial<ScheduleLayoutRecommendation>,
 ): ScheduleLayoutRecommendation {
@@ -2149,6 +2654,124 @@ function getSelectedDiseaseLabel(study: StudyForm) {
   return (study.customDisease || "").trim() || (study.disease || "").trim()
 }
 
+function isPrimaryDecisionValue(value: unknown): value is PrimaryDecisionValue {
+  return PRIMARY_DECISION_OPTIONS.some((option) => option.value === value)
+}
+
+function getPrimaryDecisionOption(value: string) {
+  return PRIMARY_DECISION_OPTIONS.find((option) => option.value === value) || null
+}
+
+function inferLegacyPrimaryDecision(study?: Partial<StudyForm>): PrimaryDecisionValue | "" {
+  const source = `${study?.primaryStudyAim || ""} ${study?.primaryStrategicObjective || ""} ${study?.primaryEvidenceUseIntent || ""}`.toLowerCase()
+
+  if (/scientific publication|publication strategy/.test(source)) return ""
+  if (/hta|market access|reimbursement/.test(source)) return "hta_reimbursement"
+  if (/safety|risk management/.test(source)) return "safety_management"
+  if (/dose|regimen/.test(source)) return "dose_regimen"
+  if (/new population|patient selection/.test(source)) return "patient_selection"
+  if (/sequence|sequencing/.test(source)) return "treatment_sequencing"
+  if (/label|regulatory commitment/.test(source)) return "label_regulatory"
+  if (/guideline|clinical practice|real-world evidence/.test(source)) return "treatment_choice"
+  if (/lifecycle|next development|evidence generation/.test(source)) return "next_development"
+
+  return ""
+}
+
+function getPrimaryDecisionLabel(study: StudyForm) {
+  const option = getPrimaryDecisionOption(study.primaryDecisionEnabled)
+
+  if (option?.value === "other") {
+    return (study.customDecisionEnabled || "").trim() || option.label
+  }
+
+  return option?.label || ""
+}
+
+function compactDecisionContext(value: string, maxLength = 120) {
+  const normalized = value.replace(/\s+/g, " ").trim().replace(/[.;:,]+$/, "")
+
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`
+}
+
+function getDerivedDecisionInterpretation(study: StudyForm) {
+  const decision = isPrimaryDecisionValue(study.primaryDecisionEnabled) ? study.primaryDecisionEnabled : ""
+
+  if (!decision) {
+    return ""
+  }
+
+  const intervention =
+    compactDecisionContext((study.topIntervention || study.intervention || "").trim(), 80) || "the intervention"
+  const indication =
+    compactDecisionContext(getResolvedIndication(study), 90) || "the target population"
+  const comparator = compactDecisionContext((study.topComparator || study.comparator || "").trim(), 80)
+  const primaryEndpoint = compactDecisionContext(splitStructuredEditorItems(getResolvedOutcomes(study))[0] || "", 100)
+  const endpointClause = primaryEndpoint ? `, based primarily on ${primaryEndpoint}` : ""
+
+  if (decision === "treatment_choice") {
+    return comparator
+      ? `Determine how ${intervention} should be used in clinical practice relative to ${comparator} for ${indication}${endpointClause}.`
+      : `Determine whether and how ${intervention} should be used in clinical practice for ${indication}${endpointClause}.`
+  }
+
+  if (decision === "patient_selection") {
+    return `Determine which patients with ${indication} should be selected for ${intervention}${endpointClause}.`
+  }
+
+  if (decision === "treatment_sequencing") {
+    return comparator
+      ? `Determine where ${intervention} belongs in the treatment sequence for ${indication}, relative to ${comparator}${endpointClause}.`
+      : `Determine where ${intervention} belongs in the treatment sequence for ${indication}${endpointClause}.`
+  }
+
+  if (decision === "dose_regimen") {
+    return `Determine the dose, schedule, duration, or modification strategy for ${intervention} that best preserves benefit-risk in ${indication}${endpointClause}.`
+  }
+
+  if (decision === "safety_management") {
+    return `Determine how a material safety risk associated with ${intervention} should be detected, monitored, prevented, or managed in ${indication}.`
+  }
+
+  if (decision === "label_regulatory") {
+    return `Determine whether the evidence supports the intended regulatory use, population, claim, or regimen for ${intervention} in ${indication}${endpointClause}.`
+  }
+
+  if (decision === "hta_reimbursement") {
+    return comparator
+      ? `Determine whether ${intervention} provides sufficient comparative clinical and value evidence versus ${comparator} to support access or reimbursement in ${indication}.`
+      : `Determine whether ${intervention} provides sufficient clinical and value evidence to support access or reimbursement in ${indication}.`
+  }
+
+  if (decision === "next_development") {
+    return `Determine whether and how ${intervention} should progress to the next development or evidence-generation step in ${indication}${endpointClause}.`
+  }
+
+  const customDecision = compactDecisionContext(study.customDecisionEnabled || "", 90)
+  return customDecision
+    ? `Determine the ${customDecision.toLowerCase()} for ${intervention} in ${indication}${endpointClause}.`
+    : "Define the specific action the study result should enable."
+}
+
+function getDecisionStatement(study: StudyForm) {
+  return (study.decisionStatement || "").trim() || getDerivedDecisionInterpretation(study)
+}
+
+function getSecondaryDecisionLabels(study: StudyForm) {
+  return (study.secondaryDecisionsEnabled || [])
+    .filter((value) => value !== study.primaryDecisionEnabled)
+    .map((value) => getPrimaryDecisionOption(value)?.label || "")
+    .filter(Boolean)
+}
+
+function getPlannedEvidenceOutputs(study: StudyForm) {
+  return (study.evidenceDissemination || []).filter((item) => item !== "Scientific publication")
+}
+
 function getPrimaryStudyAimDefinition(label: string) {
   return PRIMARY_STUDY_AIMS.find((option) => option.label === label) || null
 }
@@ -2195,19 +2818,21 @@ function inferPrimaryStudyAim(study: StudyForm) {
 }
 
 function hasPrimaryStudyAimSelection(study: StudyForm) {
-  return Boolean(inferPrimaryStudyAim(study) || getStrategicObjectiveLabel(study) || getPrimaryEvidenceUseIntent(study))
+  return Boolean(getPrimaryDecisionLabel(study))
 }
 
 function getStrategicObjectiveLabel(study: StudyForm) {
+  const decisionOption = getPrimaryDecisionOption(study.primaryDecisionEnabled)
   const mapped = getPrimaryStudyAimDefinition(inferPrimaryStudyAim(study))
 
-  return (study.primaryStrategicObjective || "").trim() || mapped?.strategic || (study.customStrategicObjective || "").trim()
+  return decisionOption?.strategic || (study.primaryStrategicObjective || "").trim() || mapped?.strategic || (study.customStrategicObjective || "").trim()
 }
 
 function getPrimaryEvidenceUseIntent(study: StudyForm) {
+  const decisionOption = getPrimaryDecisionOption(study.primaryDecisionEnabled)
   const mapped = getPrimaryStudyAimDefinition(inferPrimaryStudyAim(study))
 
-  return (study.primaryEvidenceUseIntent || "").trim() || mapped?.evidence || ""
+  return decisionOption?.evidence || (study.primaryEvidenceUseIntent || "").trim() || mapped?.evidence || ""
 }
 
 function getAllEvidenceUseIntents(study: StudyForm) {
@@ -2216,22 +2841,10 @@ function getAllEvidenceUseIntents(study: StudyForm) {
 
 function getSuggestedProtocolGuardrailProfile(study: StudyForm): Exclude<ProtocolGuardrailProfile, "auto"> {
   const category = (study.category || "").toLowerCase()
-  const intentText = `${inferPrimaryStudyAim(study)} ${getStrategicObjectiveLabel(study)} ${getPrimaryEvidenceUseIntent(study)} ${(study.secondaryEvidenceUseIntents || []).join(" ")}`.toLowerCase()
-  const isInterventional = category === "interventional"
+  const hasDecision = Boolean(getPrimaryDecisionLabel(study))
+  const phaseTwoToFour = /phase 2|phase 3|phase 4|post-marketing/i.test(study.developmentStage || "")
 
-  if (!isInterventional) {
-    return "none"
-  }
-
-  if (/guideline|practice|inform clinical practice/.test(intentText)) {
-    return "practice_informing_ped"
-  }
-
-  if (/hta|market access|publication|real-world evidence/.test(intentText)) {
-    return "lean_decision_evidence"
-  }
-
-  return "none"
+  return category === "interventional" && (hasDecision || phaseTwoToFour) ? "ped_streamlined" : "none"
 }
 
 function getResolvedProtocolGuardrailProfile(study: StudyForm): Exclude<ProtocolGuardrailProfile, "auto"> {
@@ -2239,56 +2852,115 @@ function getResolvedProtocolGuardrailProfile(study: StudyForm): Exclude<Protocol
     return getSuggestedProtocolGuardrailProfile(study)
   }
 
-  if (study.protocolGuardrailProfile === "practice_informing_ped" || study.protocolGuardrailProfile === "lean_decision_evidence") {
+  if (study.protocolGuardrailProfile === "ped_streamlined") {
     return study.protocolGuardrailProfile
   }
 
   return "none"
 }
 
-function buildProtocolGuardrailInstruction(study: StudyForm) {
-  const profile = getResolvedProtocolGuardrailProfile(study)
+function getResolvedStudyEvidenceRole(study: StudyForm): StudyEvidenceRole {
+  const decisionSet = [study.primaryDecisionEnabled, ...(study.secondaryDecisionsEnabled || [])]
+  if (decisionSet.includes("label_regulatory")) return "label_enabling"
+  if (decisionSet.includes("hta_reimbursement")) return "hta_requirement"
+  if (/regulatory commitment/i.test(`${inferPrimaryStudyAim(study)} ${getStrategicObjectiveLabel(study)}`)) {
+    return "regulatory_commitment"
+  }
+  if (study.studyEvidenceRole) return study.studyEvidenceRole
+  return ""
+}
 
-  if (profile === "none") {
-    return "Protocol guardrail profile: none selected."
+function getStudyEvidenceRoleLabel(study: StudyForm) {
+  const role = getResolvedStudyEvidenceRole(study)
+  return STUDY_EVIDENCE_ROLE_OPTIONS.find((option) => option.value === role)?.label || "Not confirmed"
+}
+
+function getProtocolGuardrailApplicability(study: StudyForm): ProtocolGuardrailApplicability {
+  if (getResolvedProtocolGuardrailProfile(study) === "none") return "none"
+
+  const phaseTwoToFour = /phase 2|phase 3|phase 4|post-marketing/i.test(study.developmentStage || "")
+  if (
+    study.category === "interventional" &&
+    getResolvedStudyEvidenceRole(study) === "non_label_enabling" &&
+    phaseTwoToFour
+  ) {
+    return "applies"
   }
 
-  const safetyStatus =
-    study.phase3SafetyDataAvailable === "yes"
-      ? "Phase 3 safety data available."
-      : study.phase3SafetyDataAvailable === "no"
-        ? "Phase 3 safety data not available; do not imply the IEGP PED template applies, but still keep lean fit-for-purpose discipline."
-        : "Phase 3 safety data availability not confirmed; apply guardrails directionally and flag this assumption."
+  if (["label_enabling", "regulatory_commitment", "hta_requirement"].includes(getResolvedStudyEvidenceRole(study))) {
+    return "external_requirements"
+  }
+
+  return "general_complexity"
+}
+
+function getProtocolGuardrailApplicabilityLabel(applicability: ProtocolGuardrailApplicability) {
+  if (applicability === "applies") return "PED applies"
+  if (applicability === "external_requirements") return "External requirements reconciliation"
+  if (applicability === "general_complexity") return "General complexity review"
+  return "No guardrail profile active"
+}
+
+function buildProtocolGuardrailInstruction(study: StudyForm) {
+  const profile = getResolvedProtocolGuardrailProfile(study)
+  const applicability = getProtocolGuardrailApplicability(study)
+  const primaryDecision = getDecisionStatement(study) || "Not defined"
+  const secondaryDecisions = getSecondaryDecisionLabels(study)
+  const decisionDiscipline = `Primary decision enabled: ${primaryDecision}. Secondary decisions: ${
+    secondaryDecisions.length ? secondaryDecisions.join(", ") : "none"
+  }. The primary decision sets the minimum evidence standard. Secondary decisions should reuse primary data and justify only narrowly targeted additions. Publication, congress, and communication outputs do not make data collection decision-critical by themselves.`
+
+  if (profile === "none") {
+    return `Protocol guardrail profile: none selected. ${decisionDiscipline}`
+  }
 
   const shared =
     "Keep the study concept focused: limit objectives, avoid endpoint laundry lists, make duration explicit, avoid unnecessary sub-studies or branching arms, and streamline data collection to what supports the objective, estimand, endpoint package, essential safety, or feasibility."
   const specialAssessmentDiscipline =
     "Special assessment discipline: PRO/COA should be included only when symptoms, functioning, QoL, tolerability, HTA, or practice interpretation are decision-critical; PK/PD or exposure-response should be included only for dose, safety, bridging, or special-population questions; biomarkers or biospecimens should be included only when they define eligibility, stratification, endpoint interpretation, safety risk, or a prespecified decision; extra imaging, labs, ECG, wearables, or remote assessments should be minimized and tied to endpoints, safety, or feasibility."
 
-  if (profile === "practice_informing_ped") {
+  if (applicability === "applies") {
     return [
-      "Protocol guardrail profile: practice-informing PED guardrails.",
-      safetyStatus,
-      "Use this discipline for late-stage/post-marketing interventional studies intended to inform clinical practice or guidelines.",
+      "Protocol guardrail profile: PED streamlined-design principles. Applicability: directly applicable because the study is confirmed as non-label-enabling and Phase 2, 3, or 4.",
+      decisionDiscipline,
       "Target no more than 5 objectives, usually 1-2 endpoints per objective, no exploratory endpoints unless individually justified, simple fit-for-purpose design, inclusive label-consistent population, explicit participant duration, and a Schedule of Activities that can fit roughly within 2 pages.",
       specialAssessmentDiscipline,
       shared,
     ].join(" ")
   }
 
+  if (applicability === "external_requirements") {
+    return [
+      `Protocol review mode: external requirements reconciliation. Study evidence role: ${getStudyEvidenceRoleLabel(study)}.`,
+      decisionDiscipline,
+      (study.externalRequirements || "").trim()
+        ? `External requirements entered by the user: ${(study.externalRequirements || "").trim()}`
+        : "No external requirement source or authority feedback has been entered. Do not imply that any requirement is verified.",
+      "Do not apply fixed objective, endpoint, eligibility, country, or site count limits and do not infer that an element should be removed or simplified. Reconcile each objective, endpoint, assessment, country, and follow-up commitment against its scientific contribution and any documented regulatory, HTA, safety, claim, or decision requirement.",
+      "Use external-requirements and design-complexity terminology only in user-facing output; do not reference other guardrail frameworks or their numerical targets.",
+      "Classify elements as requirement supported, requirement not documented, alignment gap, potential duplication, or proportionality review. Flag burden and overlap without overruling an external requirement.",
+      specialAssessmentDiscipline,
+    ].join(" ")
+  }
+
   return [
-    "Protocol guardrail profile: lean decision-evidence guardrails.",
-    "Use this lighter discipline for HTA, market-access, publication, or pragmatic evidence-generation concepts.",
-    "Prefer one clear primary objective, focused secondary objectives, 1 primary endpoint, 1-2 key secondary endpoints, and only decision-critical operational or patient-centered data collection.",
+    `Protocol review mode: general complexity review. Study evidence role: ${getStudyEvidenceRoleLabel(study)}.`,
+    decisionDiscipline,
+    "Treat objective and endpoint counts as descriptive. Do not apply PED numerical limits or recommend removal or simplification while the study role is unconfirmed.",
+    "Identify purpose and alignment gaps, possible duplication, and material operational burden. Ask the team to confirm decision, safety, regulatory, HTA, or other requirements before changing the design.",
     specialAssessmentDiscipline,
-    shared,
   ].join(" ")
 }
 
 function buildStudyForAi(study: StudyForm): StudyForm {
   return normalizeStudyForm({
     ...study,
+    decisionStatement: getDecisionStatement(study),
+    evidenceDissemination: getPlannedEvidenceOutputs(study),
+    secondaryStrategicObjectives: [],
+    secondaryEvidenceUseIntents: [],
     protocolGuardrailProfile: getResolvedProtocolGuardrailProfile(study),
+    studyEvidenceRole: getResolvedStudyEvidenceRole(study),
     protocolGuardrailNotes: buildProtocolGuardrailInstruction(study),
   })
 }
@@ -2648,6 +3320,60 @@ function buildImportedStudyPatch(current: StudyForm, imported: ImportedStudyDraf
   applyStringField("studyTitle", imported.studyTitle, "Study title", { mode: "prefer_source" })
   applyStringField("sponsor", imported.sponsor, "Sponsor or program", { mode: "prefer_source" })
 
+  const importedPrimaryDecision = isPrimaryDecisionValue(imported.primaryDecisionEnabled)
+    ? imported.primaryDecisionEnabled
+    : inferLegacyPrimaryDecision(imported)
+  if (importedPrimaryDecision && !next.primaryDecisionEnabled) {
+    const option = getPrimaryDecisionOption(importedPrimaryDecision)
+    next.primaryDecisionEnabled = importedPrimaryDecision
+    next.primaryStudyAim = option?.legacyAim || ""
+    next.primaryStrategicObjective = option?.strategic || ""
+    next.primaryEvidenceUseIntent = option?.evidence || ""
+    appliedFields.push("Primary decision enabled")
+  }
+  if ((imported.decisionStatement || "").trim() && !(next.decisionStatement || "").trim()) {
+    next.decisionStatement = (imported.decisionStatement || "").trim()
+    appliedFields.push("Decision interpretation override")
+  }
+  if (
+    !next.studyEvidenceRole &&
+    (imported.studyEvidenceRole === "non_label_enabling" ||
+      imported.studyEvidenceRole === "label_enabling" ||
+      imported.studyEvidenceRole === "regulatory_commitment" ||
+      imported.studyEvidenceRole === "hta_requirement" ||
+      imported.studyEvidenceRole === "uncertain")
+  ) {
+    next.studyEvidenceRole = imported.studyEvidenceRole
+    appliedFields.push("Study submission / evidence role")
+  }
+  applyStringField("externalRequirements", imported.externalRequirements, "External requirements or authority feedback", {
+    mode: "fill_blank",
+  })
+  if (!next.secondaryDecisionsEnabled.length && Array.isArray(imported.secondaryDecisionsEnabled)) {
+    const importedSecondaryDecisions = imported.secondaryDecisionsEnabled
+      .filter(isPrimaryDecisionValue)
+      .filter((value) => value !== next.primaryDecisionEnabled)
+      .slice(0, 3)
+    if (importedSecondaryDecisions.length) {
+      next.secondaryDecisionsEnabled = importedSecondaryDecisions
+      appliedFields.push("Secondary decisions enabled")
+    }
+  }
+  if (!getPlannedEvidenceOutputs(next).length && Array.isArray(imported.evidenceDissemination)) {
+    const importedOutputs = imported.evidenceDissemination.filter(
+      (item) =>
+        item !== "Scientific publication" &&
+        DISSEMINATION_OPTIONS.includes(item as (typeof DISSEMINATION_OPTIONS)[number]),
+    )
+    if (importedOutputs.length) {
+      next.evidenceDissemination = uniqueItemsCaseInsensitive([
+        ...getPlannedEvidenceOutputs(next),
+        ...importedOutputs,
+      ])
+      appliedFields.push("Planned evidence outputs")
+    }
+  }
+
   const matchedPrimaryStrategic = matchControlledOption(imported.primaryStrategicObjective || "", STRATEGIC_OBJECTIVES)
   if (matchedPrimaryStrategic && !getStrategicObjectiveLabel(next)) {
     next.primaryStrategicObjective = matchedPrimaryStrategic
@@ -2876,7 +3602,7 @@ function buildImportedStudyPatch(current: StudyForm, imported: ImportedStudyDraf
 function getObjectiveSuggestionMissing(study: StudyForm) {
   const missing = []
 
-  if (!hasPrimaryStudyAimSelection(study)) missing.push("primary study aim")
+  if (!hasPrimaryStudyAimSelection(study)) missing.push("primary decision enabled")
   if (!(study.developmentStage || "").trim()) missing.push("development stage")
   if (!(study.therapeuticArea || "").trim()) missing.push("therapeutic area")
   if (!getSelectedDiseaseLabel(study)) missing.push("disease")
@@ -2891,7 +3617,7 @@ function getEndpointSuggestionMissing(study: StudyForm) {
 
   if (!(study.primaryObjective || "").trim()) missing.push("primary objective")
   if (!(study.developmentStage || "").trim()) missing.push("development stage")
-  if (!hasPrimaryStudyAimSelection(study)) missing.push("primary study aim")
+  if (!hasPrimaryStudyAimSelection(study)) missing.push("primary decision enabled")
   if (!(study.therapeuticArea || "").trim()) missing.push("therapeutic area")
   if (!getSelectedDiseaseLabel(study)) missing.push("disease")
   if (!((study.topIntervention || "").trim() || (study.intervention || "").trim())) missing.push("intervention")
@@ -3032,7 +3758,7 @@ function getImpactAssessmentMissing(study: StudyForm) {
   const interventionOrExposure = ((study.topIntervention || "").trim() || (study.intervention || "").trim())
   const category = (study.category || "").trim()
 
-  if (!hasPrimaryStudyAimSelection(study)) missing.push("primary study aim")
+  if (!hasPrimaryStudyAimSelection(study)) missing.push("primary decision enabled")
   if (!studyType) missing.push("study type")
   if (!diseaseOrTopic) missing.push(category === "evidence-synthesis" ? "disease or evidence topic" : "disease")
   if (category !== "evidence-synthesis" && !interventionOrExposure) missing.push("intervention or exposure")
@@ -3706,7 +4432,9 @@ function buildEndpointSuggestionOptionsFromStudy(
     /market access|hta|guideline|practice/.test(endpointContext) ? "Supportive patient-reported experience" : "",
   ].filter(Boolean)
   const exploratoryEndpoints =
-    protocolGuardrailProfile === "practice_informing_ped" && !/biomarker|subgroup|dose|exploratory|mechanistic/.test(requestNote.toLowerCase())
+    protocolGuardrailProfile === "ped_streamlined" &&
+    getProtocolGuardrailApplicability(study) === "applies" &&
+    !/biomarker|subgroup|dose|exploratory|mechanistic/.test(requestNote.toLowerCase())
       ? []
       : /biomarker|subgroup|dose|exploratory|mechanistic/.test(requestNote.toLowerCase()) ||
           /oncology|tumou?r|biomarker|dose/.test(`${study.therapeuticArea} ${study.topInterventionClass} ${strategicObjective}`.toLowerCase())
@@ -4766,7 +5494,7 @@ function validateStudy(study: StudyForm) {
 
   if (!(study.studyTitle || "").trim()) missing.push("Study title")
   if (category === "interventional" && !(study.developmentStage || "").trim()) missing.push("Development stage")
-  if (!hasPrimaryStudyAimSelection(study)) missing.push("Primary study aim")
+  if (!hasPrimaryStudyAimSelection(study)) missing.push("Primary decision enabled")
   if (!isEvidenceSynthesis && !isNonClinical && !(study.therapeuticArea || "").trim()) missing.push("Therapeutic area")
   if (!diseaseOrTopic) missing.push(isEvidenceSynthesis ? "Disease, topic, or evidence question" : "Disease or custom disease")
   if (!isEvidenceSynthesis && !interventionOrExposure) missing.push(isNonClinical ? "Test article, model, or exposure" : "Intervention / exposure")
@@ -4948,6 +5676,265 @@ function splitStructuredEditorItems(value: string) {
   )
 }
 
+function splitClinicalList(value: string) {
+  const items: string[] = []
+  let current = ""
+  let depth = 0
+
+  for (const character of value) {
+    if (character === "(" || character === "[" || character === "{") depth += 1
+    if (character === ")" || character === "]" || character === "}") depth = Math.max(0, depth - 1)
+
+    if ((character === "," || character === ";" || character === "\n") && depth === 0) {
+      if (current.trim()) items.push(current.trim())
+      current = ""
+      continue
+    }
+
+    current += character
+  }
+
+  if (current.trim()) items.push(current.trim())
+
+  return items
+    .map((item) => item.replace(/^[\s.:–—-]+|[\s.]+$/g, "").trim())
+    .filter(Boolean)
+}
+
+function hasEndpointConcept(value: string) {
+  return /\b(?:pfs2?|progression[- ]free survival|os|overall survival|orr|objective response|dor|duration of response|dcr|disease control|efs|event[- ]free survival|dfs|disease[- ]free survival|rfs|recurrence[- ]free survival|ttd|time to deterioration|ttnt|time to (?:subsequent|next|treatment)|treatment failure|post[- ]progression survival|response|survival|safety|tolerability|adverse events?|saes?|aes(i)?|quality of life|qol|patient[- ]reported|pros?|pk|pd|pharmacokinetic|pharmacodynamic|exposure[- ]response|biomarkers?|biospecimens?|ctdna|healthcare utilization|resource utilization|hospitali[sz]ation|curative[- ]intent|procedure)\b/i.test(
+    value,
+  )
+}
+
+function normalizeGuardrailEndpointRole(value: string): GuardrailEndpointRole {
+  const normalized = value.toLowerCase()
+  if (normalized.startsWith("primary")) return "primary"
+  if (normalized.startsWith("key secondary")) return "key_secondary"
+  if (normalized.startsWith("secondary")) return "secondary"
+  if (normalized.startsWith("exploratory")) return "exploratory"
+  return "supporting"
+}
+
+function splitGuardrailEndpointItems(value: string): GuardrailEndpointItem[] {
+  const normalized = value.trim()
+  if (!normalized) return []
+
+  const rolePattern =
+    /(?:^|[.!?]\s+|\n+)(primary(?: endpoint)?|key secondary(?:\/other)?|secondary(?:\/other)?|secondary(?: endpoints?)?|exploratory(?:\/other)?|exploratory(?: endpoints?)?|other)\s*:\s*/gi
+  const matches = Array.from(normalized.matchAll(rolePattern))
+  const parsed: GuardrailEndpointItem[] = []
+
+  if (matches.length) {
+    matches.forEach((match, index) => {
+      const start = (match.index || 0) + match[0].length
+      const end = index + 1 < matches.length ? matches[index + 1].index || normalized.length : normalized.length
+      const content = normalized.slice(start, end).replace(/^[\s.:–—-]+|[\s.]+$/g, "")
+      const role = normalizeGuardrailEndpointRole(match[1])
+      const parts = splitClinicalList(content)
+
+      parts.forEach((part) => parsed.push({ text: part, role }))
+    })
+  } else {
+    splitStructuredEditorItems(normalized).forEach((item, itemIndex) => {
+      const parts = splitClinicalList(item)
+      const endpointLikeParts = parts.filter(hasEndpointConcept)
+      const shouldAtomize = parts.length > 1 && endpointLikeParts.length >= 2
+      const resolvedParts = shouldAtomize ? parts : [item]
+
+      resolvedParts.forEach((part, partIndex) => {
+        parsed.push({
+          text: part,
+          role: itemIndex === 0 && partIndex === 0 ? "primary" : "supporting",
+        })
+      })
+    })
+  }
+
+  return uniqueItemsCaseInsensitive(parsed.map((item) => `${item.role}::${item.text}`)).map((item) => {
+    const [role, ...textParts] = item.split("::")
+    return {
+      role: role as GuardrailEndpointRole,
+      text: textParts.join("::"),
+    }
+  })
+}
+
+function splitGuardrailSecondaryObjectives(value: string): GuardrailObjectiveItem[] {
+  return splitStructuredEditorItems(value).flatMap((objective, sourceIndex) => {
+    const parts = splitClinicalList(objective)
+    const endpointLikeParts = parts.filter(hasEndpointConcept)
+    const shouldAtomize = parts.length > 1 && endpointLikeParts.length >= 2
+    const resolvedParts = shouldAtomize ? parts : [objective]
+
+    return resolvedParts.map((text, partIndex) => ({
+      text,
+      sourceIndex,
+      partIndex,
+      compound: shouldAtomize,
+    }))
+  })
+}
+
+function getGuardrailObjectiveTarget(profile: ProtocolGuardrailProfile) {
+  return profile === "ped_streamlined" ? 5 : 7
+}
+
+function getGuardrailEndpointTarget(profile: ProtocolGuardrailProfile) {
+  if (profile === "ped_streamlined") return 6
+  return 10
+}
+
+function getGuardrailConceptTokens(value: string) {
+  const stopWords = new Set([
+    "and",
+    "the",
+    "for",
+    "from",
+    "with",
+    "within",
+    "among",
+    "using",
+    "evaluate",
+    "assess",
+    "determine",
+    "compare",
+    "effect",
+    "effects",
+    "outcome",
+    "outcomes",
+    "endpoint",
+    "endpoints",
+    "objective",
+    "objectives",
+    "patients",
+    "participants",
+    "treatment",
+    "study",
+  ])
+
+  return new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 1 && !stopWords.has(token)),
+  )
+}
+
+function getGuardrailConceptOverlap(left: string, right: string) {
+  const leftTokens = getGuardrailConceptTokens(left)
+  const rightTokens = getGuardrailConceptTokens(right)
+  let overlap = 0
+
+  leftTokens.forEach((token) => {
+    if (rightTokens.has(token)) overlap += token.length <= 3 ? 2 : 1
+  })
+
+  return overlap
+}
+
+function extractGuardrailOperationalCount(value: string, unitPattern: string) {
+  const match = value.match(
+    new RegExp(
+      `(?:~|approximately|approx\\.?|about)?\\s*([0-9][0-9,]*)\\s+(?:[a-z][a-z/-]*\\s+){0,4}(?:${unitPattern})\\b`,
+      "i",
+    ),
+  )
+  if (!match) return null
+  const parsed = Number(match[1].replaceAll(",", ""))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function assessGeographyFootprint(study: StudyForm, applicability: ProtocolGuardrailApplicability) {
+  const geography = (study.geography || "").trim()
+  const combinedText = `${geography} ${study.operationalNotes || ""}`
+  const countryCount = extractGuardrailOperationalCount(combinedText, "countries|country")
+  const siteCount = extractGuardrailOperationalCount(combinedText, "sites|site")
+  const participantCount = extractGuardrailOperationalCount(study.sampleSize || "", "participants|patients|subjects")
+  const participantsPerSite =
+    participantCount && siteCount && siteCount > 0 ? Math.round((participantCount / siteCount) * 10) / 10 : null
+  const countryTarget = 20
+  const siteTarget = 100
+  const directPed = applicability === "applies"
+  const globalFootprint = /global|multi[- ]?country|multinational|international/i.test(combinedText)
+  const launchOrReimbursementRisk = /uncertain (?:reimbursement|launch)|launch uncertainty|no planned launch|non-launch market/i.test(
+    combinedText,
+  )
+  const startupRisk = /lengthy|long|complex|delayed|slow/.test(combinedText.toLowerCase()) && /start[- ]?up|activation/.test(combinedText.toLowerCase())
+  const enrollmentRisk = /low[- ]?enroll|low recruitment|slow recruitment|late countr|late site/i.test(combinedText)
+  const inefficientSiteDensity = participantsPerSite !== null && participantsPerSite < 4
+  const exceedsCountryTarget = directPed && countryCount !== null && countryCount > countryTarget
+  const exceedsSiteTarget = directPed && siteCount !== null && siteCount > siteTarget
+  const footprintNeedsSimplification =
+    exceedsCountryTarget ||
+    exceedsSiteTarget ||
+    inefficientSiteDensity ||
+    launchOrReimbursementRisk ||
+    startupRisk ||
+    enrollmentRisk
+  const footprintNeedsAlignment =
+    !footprintNeedsSimplification && (globalFootprint || (countryCount !== null && countryCount >= 12))
+  const footprintRecommendation: ProtocolGuardrailItemRecommendation = footprintNeedsSimplification
+    ? "simplify"
+    : footprintNeedsAlignment
+      ? "align"
+      : "retain"
+  const footprintSignals = [
+    exceedsCountryTarget ? `${countryCount} countries exceeds the focused reference of about ${countryTarget}` : "",
+    exceedsSiteTarget ? `${siteCount} sites exceeds the focused reference of about ${siteTarget}` : "",
+    inefficientSiteDensity && participantsPerSite !== null
+      ? `about ${participantsPerSite} participants per site indicates a diffuse, low-yield footprint`
+      : "",
+    launchOrReimbursementRisk ? "markets with uncertain launch or reimbursement are included" : "",
+    startupRisk ? "lengthy or complex start-up is anticipated" : "",
+    enrollmentRisk ? "low-enrollment or late-activating countries/sites are anticipated" : "",
+  ].filter(Boolean)
+  const externalRequirements = applicability === "external_requirements"
+  const footprintRationale =
+    footprintRecommendation === "simplify"
+      ? directPed
+        ? `${footprintSignals.join("; ")}. Reduce the footprint to countries and sites that materially support recruitment, representativeness, the selected decision, or a defined access need.`
+        : `${footprintSignals.join("; ")}. This is a proportionality signal, not a recommendation to reduce an externally required footprint. Document each country's recruitment, representativeness, regulatory, HTA, access, or safety basis and address low-yield or high-obligation markets in the operating plan.`
+      : footprintRecommendation === "align"
+        ? externalRequirements
+          ? "The footprint requires requirement traceability by country, including recruitment contribution, external validity, regulatory or HTA need, launch/access relevance, post-trial obligations, start-up time, and close-out burden. Country and site counts are treated as descriptive context."
+          : "The broad footprint requires an explicit country-selection rationale covering recruitment contribution, external validity, launch/access relevance, start-up time, and close-out burden. No PED country or site limit has been applied."
+        : "The footprint does not show an obvious scale or efficiency concern from the current inputs; retain only decision-relevant, enrollment-productive countries and sites."
+
+  const postTrialAccessMentioned = /post[- ]trial access|\bpta\b|continued (?:treatment|access|supply)|treatment after study/i.test(
+    combinedText,
+  )
+  const postTrialAccessPlanDefined =
+    /(?:post[- ]trial access|\bpta\b|continued (?:treatment|access|supply)).{0,100}(?:assessed|defined|planned|budgeted|not required|available)/i.test(
+      combinedText,
+    )
+  const postTrialAccessAssessmentNeeded =
+    study.category === "interventional" &&
+    (postTrialAccessMentioned || (countryCount !== null && countryCount >= 10) || globalFootprint)
+  const postTrialAccessRecommendation: ProtocolGuardrailItemRecommendation = !postTrialAccessAssessmentNeeded
+    ? "retain"
+    : postTrialAccessPlanDefined
+      ? "retain"
+      : "align"
+  const postTrialAccessRationale = postTrialAccessAssessmentNeeded
+    ? postTrialAccessPlanDefined
+      ? "A post-trial or continued-treatment access approach is visible. Confirm that country-specific obligations, duration, supply, monitoring, contracting, and budget assumptions are complete."
+      : "Post-trial access and continued-treatment obligations can vary by country and may extend drug supply, monitoring, contracting, site activity, and close-out cost. Complete a country-level assessment before finalizing the footprint; this is an operational flag, not a jurisdiction-specific legal conclusion."
+    : "No broad multi-country post-trial-access assessment trigger is visible from the current footprint."
+
+  return {
+    countryCount,
+    siteCount,
+    participantsPerSite,
+    footprintRecommendation,
+    footprintRationale,
+    postTrialAccessAssessmentNeeded,
+    postTrialAccessRecommendation,
+    postTrialAccessRationale,
+  }
+}
+
 function buildStructuredEditorText(items: StructuredEditorItem[]) {
   return items
     .filter((item) => item.active && item.text.trim())
@@ -4973,16 +5960,344 @@ function parseStructuredEditorItems(value: string, previous: StructuredEditorIte
   })
 }
 
-function getProtocolGuardrailStatusTone(status: ProtocolGuardrailCheckStatus) {
+function getProtocolGuardrailStatusTone(
+  status: ProtocolGuardrailCheckStatus,
+  applicability: ProtocolGuardrailApplicability = "applies",
+) {
   if (status === "aligned") return "border-emerald-200 bg-emerald-50 text-emerald-800"
   if (status === "needs_justification") return "border-amber-200 bg-amber-50 text-amber-900"
+  if (applicability !== "applies") return "border-amber-200 bg-amber-50 text-amber-900"
   return "border-rose-200 bg-rose-50 text-rose-800"
 }
 
-function getProtocolGuardrailStatusLabel(status: ProtocolGuardrailCheckStatus) {
+function getProtocolGuardrailStatusLabel(
+  status: ProtocolGuardrailCheckStatus,
+  applicability: ProtocolGuardrailApplicability = "applies",
+) {
   if (status === "aligned") return "Aligned"
-  if (status === "needs_justification") return "Needs justification"
-  return "Consider simplifying"
+  if (applicability === "external_requirements") {
+    return status === "consider_simplifying" ? "Proportionality review" : "Requirement review"
+  }
+  if (applicability === "general_complexity") {
+    return status === "consider_simplifying" ? "Complexity review" : "Clarification needed"
+  }
+  if (status === "needs_justification") return "Review required"
+  return "Action required"
+}
+
+function getProtocolGuardrailAlignmentStatus(check: ProtocolGuardrailCheck): ProtocolGuardrailAlignmentStatus {
+  if (check.alignmentStatus) return check.alignmentStatus
+  if (check.status === "aligned") return "aligned"
+  if (check.status === "consider_simplifying") return "partially_aligned"
+  return "partially_aligned"
+}
+
+function getProtocolGuardrailRecommendedAction(check: ProtocolGuardrailCheck): ProtocolGuardrailRecommendedAction {
+  if (check.recommendedAction) return check.recommendedAction
+  if (check.status === "aligned") return "keep"
+  if (check.status === "consider_simplifying") return "simplify"
+  return "align"
+}
+
+function getProtocolGuardrailAlignmentLabel(check: ProtocolGuardrailCheck) {
+  const status = getProtocolGuardrailAlignmentStatus(check)
+  if (status === "aligned") return "Aligned"
+  if (status === "partially_aligned") return "Partially aligned"
+  if (status === "not_aligned") return "Not aligned"
+  return "Justified exception"
+}
+
+function getProtocolGuardrailAlignmentTone(check: ProtocolGuardrailCheck) {
+  const status = getProtocolGuardrailAlignmentStatus(check)
+  if (status === "aligned") return "border-emerald-200 bg-emerald-50 text-emerald-800"
+  if (status === "partially_aligned") return "border-amber-200 bg-amber-50 text-amber-900"
+  if (status === "not_aligned") return "border-rose-200 bg-rose-50 text-rose-800"
+  return "border-violet-200 bg-violet-50 text-violet-900"
+}
+
+function getProtocolGuardrailRecommendedActionLabel(check: ProtocolGuardrailCheck) {
+  const action = getProtocolGuardrailRecommendedAction(check)
+  if (action === "keep") return "Keep"
+  if (action === "align") return "Align"
+  if (action === "simplify") return "Simplify"
+  if (action === "remove") return "Remove"
+  return "Keep as exception"
+}
+
+function getProtocolGuardrailRecommendedActionTone(check: ProtocolGuardrailCheck) {
+  const action = getProtocolGuardrailRecommendedAction(check)
+  if (action === "keep") return "border-emerald-200 bg-white text-emerald-800"
+  if (action === "align") return "border-sky-200 bg-white text-sky-900"
+  if (action === "simplify") return "border-amber-200 bg-white text-amber-900"
+  if (action === "remove") return "border-rose-200 bg-white text-rose-800"
+  return "border-violet-200 bg-white text-violet-900"
+}
+
+function getProtocolGuardrailItemRecommendationLabel(
+  recommendation: ProtocolGuardrailItemRecommendation,
+  applicability: ProtocolGuardrailApplicability = "applies",
+) {
+  if (applicability === "external_requirements") {
+    if (recommendation === "retain") return "Design supported"
+    if (recommendation === "align") return "Clarify role"
+    if (recommendation === "simplify") return "Proportionality review"
+    return "Potential overlap"
+  }
+  if (applicability === "general_complexity") {
+    if (recommendation === "retain") return "Purpose supported"
+    if (recommendation === "align") return "Alignment gap"
+    return "Complexity review"
+  }
+  if (recommendation === "retain") return "Retain"
+  if (recommendation === "align") return "Clarify / align"
+  if (recommendation === "simplify") return "Simplify"
+  return "Remove"
+}
+
+function getProtocolGuardrailItemRecommendationTone(
+  recommendation: ProtocolGuardrailItemRecommendation,
+  applicability: ProtocolGuardrailApplicability = "applies",
+) {
+  if (recommendation === "retain") return "border-emerald-200 bg-emerald-50 text-emerald-800"
+  if (recommendation === "align") return "border-sky-200 bg-sky-50 text-sky-900"
+  if (applicability !== "applies") return "border-amber-200 bg-amber-50 text-amber-900"
+  if (recommendation === "simplify") return "border-amber-200 bg-amber-50 text-amber-900"
+  return "border-rose-200 bg-rose-50 text-rose-800"
+}
+
+function getProtocolGuardrailDesignAssessment(
+  item: ProtocolGuardrailReconciliationItem,
+): ProtocolGuardrailDesignAssessment {
+  const text = `${item.element} ${item.role} ${item.rationale}`.toLowerCase()
+
+  if (/multiplicity|alpha allocation|gatekeep|hierarch(?:y|ical)|type i error/.test(text)) return "multiplicity"
+  if (/^(?:objectives|endpoints)-package$/.test(item.id) && item.recommendation === "retain") return "unclear"
+  if (/overlap|duplicat|crowded|same construct|redundant/.test(text) || item.recommendation === "remove") return "overlap"
+  if (item.recommendation === "simplify" || /disproportionate|material complexity|low-yield/.test(text)) {
+    return "disproportionate"
+  }
+  if (item.recommendation === "align" || /not explicit|not defined|clarify|incomplete|not yet/.test(text)) return "unclear"
+  if (
+    /^objective-primary$|^endpoint-0$|^design-(?:overview|comparator|population)$|^timing-sample-size$/.test(item.id) ||
+    /primary objective|primary endpoint|safety endpoint|essential safety/.test(text)
+  ) {
+    return "core"
+  }
+  return "supportive"
+}
+
+function getProtocolGuardrailDesignAssessmentLabel(assessment: ProtocolGuardrailDesignAssessment) {
+  if (assessment === "core") return "Core evidence"
+  if (assessment === "supportive") return "Distinct supportive value"
+  if (assessment === "unclear") return "Clarify decision role"
+  if (assessment === "overlap") return "Potential overlap"
+  if (assessment === "multiplicity") return "Multiplicity review"
+  return "Disproportionate burden"
+}
+
+function getProtocolGuardrailDesignAssessmentTone(assessment: ProtocolGuardrailDesignAssessment) {
+  if (assessment === "core") return "border-emerald-200 bg-emerald-50 text-emerald-800"
+  if (assessment === "supportive") return "border-sky-200 bg-sky-50 text-sky-900"
+  if (assessment === "unclear") return "border-amber-200 bg-amber-50 text-amber-900"
+  if (assessment === "overlap") return "border-violet-200 bg-violet-50 text-violet-900"
+  return "border-rose-200 bg-rose-50 text-rose-800"
+}
+
+function getExternalRequirementStatus(
+  item: ProtocolGuardrailReconciliationItem,
+  study: StudyForm,
+  applicability: ProtocolGuardrailApplicability,
+): ExternalRequirementStatus {
+  if (applicability !== "external_requirements") return "not_applicable"
+
+  const requirements = (study.externalRequirements || "").trim()
+  if (!requirements) return "not_provided"
+
+  const itemTokens = getGuardrailConceptTokens(`${item.element} ${item.role} ${item.linkedTo}`)
+  const requirementSentences = requirements
+    .split(/\n+|(?<=[.!?;])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+  const requirementPattern = /\brequir(?:e|ed|ement)|\bmandat(?:e|ed|ory)|\brequest(?:ed)?|\bcommitment|\bagreed|\bexpect(?:ed|ation)|\badvice|\bfeedback/i
+  const authorityPattern = /\bFDA\b|\bEMA\b|\bMHRA\b|\bPMDA\b|\bHTA\b|\bNICE\b|\bG-BA\b|\bHAS\b|\bCADTH\b|\bpayer\b|regulator|health authority|agency|authority/i
+  const relevant = requirementSentences.filter((sentence) => {
+    const sentenceTokens = getGuardrailConceptTokens(sentence)
+    let overlap = 0
+    itemTokens.forEach((token) => {
+      if (sentenceTokens.has(token)) overlap += 1
+    })
+    return overlap > 0 || /all objectives|all endpoints|entire study|protocol package|overall design/i.test(sentence)
+  })
+
+  if (relevant.some((sentence) => requirementPattern.test(sentence) && authorityPattern.test(sentence))) {
+    return "documented"
+  }
+  if (relevant.some((sentence) => requirementPattern.test(sentence))) return "mentioned"
+  return "not_provided"
+}
+
+function getExternalRequirementStatusLabel(status: ExternalRequirementStatus) {
+  if (status === "documented") return "Documented in inputs"
+  if (status === "mentioned") return "Mentioned; source unclear"
+  if (status === "not_provided") return "External basis not provided"
+  return "Not applicable"
+}
+
+function getExternalRequirementStatusTone(status: ExternalRequirementStatus) {
+  if (status === "documented") return "border-emerald-200 bg-emerald-50 text-emerald-800"
+  if (status === "mentioned") return "border-amber-200 bg-amber-50 text-amber-900"
+  if (status === "not_provided") return "border-slate-300 bg-slate-50 text-slate-700"
+  return "border-slate-200 bg-white text-slate-500"
+}
+
+function getProtocolGuardrailItemDisplayLabel(
+  item: ProtocolGuardrailReconciliationItem,
+  applicability: ProtocolGuardrailApplicability,
+) {
+  if (applicability === "external_requirements") {
+    return getProtocolGuardrailDesignAssessmentLabel(getProtocolGuardrailDesignAssessment(item))
+  }
+
+  return getProtocolGuardrailItemRecommendationLabel(item.recommendation, applicability)
+}
+
+function getProtocolGuardrailLegend(applicability: ProtocolGuardrailApplicability) {
+  if (applicability === "external_requirements") {
+    return [
+      { label: "Core evidence", tone: getProtocolGuardrailDesignAssessmentTone("core") },
+      { label: "Distinct supportive value", tone: getProtocolGuardrailDesignAssessmentTone("supportive") },
+      { label: "Clarify decision role", tone: getProtocolGuardrailDesignAssessmentTone("unclear") },
+      { label: "Potential overlap", tone: getProtocolGuardrailDesignAssessmentTone("overlap") },
+      { label: "Multiplicity review", tone: getProtocolGuardrailDesignAssessmentTone("multiplicity") },
+      { label: "Disproportionate burden", tone: getProtocolGuardrailDesignAssessmentTone("disproportionate") },
+    ]
+  }
+
+  if (applicability === "general_complexity") {
+    return [
+      { label: "Purpose supported", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+      { label: "Alignment gap", tone: "border-sky-200 bg-sky-50 text-sky-900" },
+      { label: "Requirement clarification", tone: "border-amber-200 bg-amber-50 text-amber-900" },
+      { label: "Complexity review", tone: "border-amber-200 bg-amber-50 text-amber-900" },
+    ]
+  }
+
+  return (["retain", "align", "simplify", "remove"] as ProtocolGuardrailItemRecommendation[]).map(
+    (recommendation) => ({
+      label: getProtocolGuardrailItemRecommendationLabel(recommendation, applicability),
+      tone: getProtocolGuardrailItemRecommendationTone(recommendation, applicability),
+    }),
+  )
+}
+
+function getProtocolGuardrailItemRationale(
+  item: ProtocolGuardrailReconciliationItem,
+  applicability: ProtocolGuardrailApplicability,
+) {
+  if (applicability === "applies" || applicability === "none") {
+    return item.rationale
+  }
+
+  const safeSentences = item.rationale
+    .split(/(?<=[.!?])\s+/)
+    .filter(
+      (sentence) =>
+        !/\bremove\w*\b|\bsimplif\w*\b|\bmust be removed\b|\bretain\b.{0,24}\bonly\b/i.test(sentence),
+    )
+  const safeRationale = safeSentences.join(" ").trim()
+
+  if (applicability === "external_requirements") {
+    if (item.recommendation === "retain") {
+      return safeRationale || "The element has a visible role in the current evidence chain."
+    }
+    if (item.recommendation === "align") {
+      return `${safeRationale || "The element's role is not yet fully established."} Resolve the scientific or design alignment independently of whether an external requirement exists.`
+    }
+    if (item.recommendation === "simplify") {
+      return `Design complexity signal: ${safeRationale || "The element adds material burden or claim complexity."} Review proportionality and implementation options; an externally required element may still need to be retained.`
+    }
+    return `Potential overlap signal: ${safeRationale || "The element may not add distinct information."} Confirm its incremental claim or decision contribution; an external requirement is shown separately.`
+  }
+
+  if (item.recommendation === "retain") {
+    return (
+      safeRationale ||
+      "The element has a visible purpose in the current evidence chain."
+    )
+  }
+
+  if (item.recommendation === "align") {
+    return `${safeRationale || "The element's role is not yet fully established."} ${
+      "Clarify its decision, safety, regulatory, HTA, or other purpose before changing the design."
+    }`
+  }
+
+  const signal = safeRationale ? ` Complexity signal: ${safeRationale}` : ""
+
+  if (item.recommendation === "simplify") {
+    return `This element contributes material complexity relative to the currently documented evidence chain.${signal} Confirm the requirement source, owner, and decision consequence, then review whether the burden is proportionate.`
+  }
+
+  return `The current evidence chain suggests possible overlap or lacks a documented requirement for this element.${signal} Confirm whether it has a distinct regulatory, HTA, safety, claim, or decision role before changing the design.`
+}
+
+function getProtocolGuardrailItemRecommendationFromCheck(
+  check: ProtocolGuardrailCheck | undefined,
+  fallback: ProtocolGuardrailItemRecommendation = "retain",
+) {
+  if (!check) return fallback
+
+  const recommendation = getProtocolGuardrailRecommendedAction(check)
+  if (recommendation === "keep") return "retain"
+  if (recommendation === "align" || recommendation === "keep_as_exception") return "align"
+  if (recommendation === "simplify") return "simplify"
+  return "remove"
+}
+
+function getProtocolGuardrailPriorityActionLabel(lane: ProtocolGuardrailPriorityAction["lane"]) {
+  if (lane === "resolve") return "Resolve before downstream design"
+  if (lane === "justify") return "Alignment decision required"
+  return "Simplify or remove"
+}
+
+function getProtocolGuardrailPriorityActionTone(lane: ProtocolGuardrailPriorityAction["lane"]) {
+  if (lane === "resolve") return "border-rose-200 bg-rose-50 text-rose-900"
+  if (lane === "justify") return "border-amber-200 bg-amber-50 text-amber-950"
+  return "border-sky-200 bg-sky-50 text-sky-950"
+}
+
+function getProtocolGuardrailDestinations(checkId: string): ProtocolGuardrailDestination[] {
+  const decision = { label: "Decision framing", tab: "study" as const, sectionId: "study-decision-framing" }
+  const objectives = { label: "Research objectives", tab: "study" as const, sectionId: "study-objectives" }
+  const population = { label: "Population & eligibility", tab: "study" as const, sectionId: "study-population" }
+  const comparator = { label: "Comparator", tab: "study" as const, sectionId: "study-comparator" }
+  const endpoints = { label: "Endpoints & assessments", tab: "study" as const, sectionId: "study-endpoints" }
+  const timing = { label: "Timeline", tab: "study" as const, sectionId: "study-timing" }
+  const statistics = { label: "PICO & Stats", tab: "pico" as const, sectionId: "pico-statistics" }
+  const schedule = { label: "Schedule of Activities", tab: "schedule" as const, sectionId: "schedule-activities" }
+
+  if (checkId === "decision-intent" || checkId === "stage-fit" || checkId === "evidence-role") {
+    return [decision]
+  }
+
+  if (checkId === "primary-decision-fit" || checkId.startsWith("secondary-decision-")) {
+    return [decision, objectives, endpoints]
+  }
+
+  if (checkId === "objectives") return [objectives]
+  if (checkId === "endpoints") return [endpoints]
+  if (checkId === "estimand") return [endpoints, statistics]
+  if (checkId === "duration") return [timing, statistics, schedule]
+  if (checkId === "geography-footprint" || checkId === "post-trial-access") return [timing]
+  if (checkId === "comparator") return [comparator, objectives]
+  if (checkId === "eligibility") return [population]
+  if (checkId === "special-assessments") return [endpoints, schedule]
+
+  if (["exploratory", "pro-coa", "pk-pd", "biomarkers"].includes(checkId)) {
+    return [decision, objectives, endpoints, schedule]
+  }
+
+  return []
 }
 
 function containsAnyPattern(value: string, patterns: RegExp[]) {
@@ -4993,7 +6308,7 @@ function getSpecialAssessmentSignals(study: StudyForm) {
   const objectiveText = `${study.primaryObjective} ${study.secondaryObjectives}`.toLowerCase()
   const endpointText = getResolvedOutcomes(study).toLowerCase()
   const designText = `${study.designOverview} ${study.population} ${study.eligibility} ${study.operationalNotes}`.toLowerCase()
-  const intentText = `${inferPrimaryStudyAim(study)} ${getStrategicObjectiveLabel(study)} ${getPrimaryEvidenceUseIntent(study)} ${(study.secondaryEvidenceUseIntents || []).join(" ")}`.toLowerCase()
+  const intentText = `${study.primaryDecisionEnabled} ${getPrimaryDecisionLabel(study)} ${getDecisionStatement(study)} ${getSecondaryDecisionLabels(study).join(" ")} ${inferPrimaryStudyAim(study)} ${getStrategicObjectiveLabel(study)} ${getPrimaryEvidenceUseIntent(study)}`.toLowerCase()
   const interventionText = `${study.topInterventionClass} ${study.topLineOfTherapy}`.toLowerCase()
   const combinedText = `${objectiveText} ${endpointText} ${designText} ${intentText} ${interventionText}`
 
@@ -5033,95 +6348,978 @@ function getSpecialAssessmentSignals(study: StudyForm) {
   }
 }
 
-function buildProtocolGuardrailAssessment(study: StudyForm): ProtocolGuardrailAssessment {
+function getProtocolGuardrailStageStatus(checks: ProtocolGuardrailCheck[], checkIds: string[]): ProtocolGuardrailCheckStatus {
+  const stageChecks = checks.filter((check) => checkIds.includes(check.id))
+
+  if (stageChecks.some((check) => check.status === "consider_simplifying")) return "consider_simplifying"
+  if (stageChecks.some((check) => check.status === "needs_justification")) return "needs_justification"
+  return "aligned"
+}
+
+function getProtocolGuardrailPriorityLane(check: ProtocolGuardrailCheck): ProtocolGuardrailPriorityAction["lane"] {
+  if (check.status === "consider_simplifying") return "simplify"
+  if (["decision-intent", "primary-decision-fit", "objectives", "endpoints", "estimand", "duration", "comparator"].includes(check.id)) return "resolve"
+  return "justify"
+}
+
+function buildDecisionAdaptiveCheck(
+  decisionValue: PrimaryDecisionValue,
+  study: StudyForm,
+  stats: StatsForm,
+  role: "primary" | "secondary",
+): ProtocolGuardrailCheck {
+  const option = getPrimaryDecisionOption(decisionValue)
+  const label = option?.label || "Defined decision"
+  const objectiveText = `${study.primaryObjective} ${study.secondaryObjectives}`.toLowerCase()
+  const endpointText = getResolvedOutcomes(study).toLowerCase()
+  const designText = `${study.designOverview} ${study.population} ${study.eligibility} ${study.timeline} ${study.operationalNotes}`.toLowerCase()
+  const analysisText = `${stats.estimand} ${stats.hypothesis} ${stats.analysisModel} ${stats.rationale}`.toLowerCase()
+  const combinedText = `${objectiveText} ${endpointText} ${designText} ${analysisText}`
+  const hasComparator = Boolean(((study.topComparator || "").trim() || (study.comparator || "").trim()))
+  const hasClinicalOutcome = /survival|progression|response|event|relapse|symptom|function|quality of life|hospital|mortality|clinical benefit|tolerability/.test(
+    endpointText,
+  )
+  const hasEstimand = Boolean((stats.estimand || "").trim())
+  let supported = false
+  let supportDescription = ""
+  let missingDescription = ""
+
+  if (decisionValue === "treatment_choice") {
+    supported = hasClinicalOutcome && (hasComparator || study.category !== "interventional")
+    supportDescription = "Comparative or benchmarked clinically meaningful outcome evidence is visible."
+    missingDescription = "Treatment-choice evidence needs a clinically meaningful outcome and a relevant comparator or benchmark."
+  } else if (decisionValue === "patient_selection") {
+    supported = /subgroup|interaction|patient selection|population definition|biomarker|risk factor|frail|comorbid|age group|eligibility/.test(combinedText)
+    supportDescription = "The concept includes a prespecified population-defining or treatment-effect heterogeneity approach."
+    missingDescription = "Patient-selection evidence is not yet anchored to a prespecified defining variable, subgroup, or interaction strategy."
+  } else if (decisionValue === "treatment_sequencing") {
+    supported = /sequence|sequencing|prior therap|subsequent therap|line of therap|treatment transition|post-progression|switch/.test(combinedText)
+    supportDescription = "Prior, subsequent, or transition treatment information is linked to the study question."
+    missingDescription = "Sequencing evidence needs explicit prior/subsequent treatment capture and clinically interpretable transition timing."
+  } else if (decisionValue === "dose_regimen") {
+    supported = /dose|regimen|schedule|dose intensity|dose modification|interruption|reduction|exposure|tolerability/.test(combinedText)
+    supportDescription = "Dose, regimen, treatment modification, exposure, or tolerability evidence is linked to the decision."
+    missingDescription = "The concept does not yet show the dose, regimen, modification, or maintained-benefit evidence needed for this decision."
+  } else if (decisionValue === "safety_management") {
+    supported = /adverse|safety|toxicity|risk factor|time to onset|resolution|management|dose modification|serious adverse|aesi/.test(combinedText)
+    supportDescription = "Targeted safety occurrence, timing, risk-factor, or management evidence is visible."
+    missingDescription = "The safety-management decision is not yet tied to a specific risk, management action, or clinically useful time course."
+  } else if (decisionValue === "label_regulatory") {
+    supported = hasClinicalOutcome && hasEstimand && (hasComparator || study.category !== "interventional")
+    supportDescription = "A claim-relevant outcome, estimand, and comparator or benchmark are present."
+    missingDescription = "Label or regulatory use needs a claim-relevant endpoint, explicit estimand, and defensible comparator or benchmark."
+  } else if (decisionValue === "hta_reimbursement") {
+    supported =
+      hasComparator &&
+      /quality of life|patient-reported|resource|utili[sz]ation|hospital|cost|treatment duration|discontinuation|productivity/.test(combinedText)
+    supportDescription = "Comparative evidence is accompanied by at least one targeted patient-value or resource-use dimension."
+    missingDescription = "HTA or reimbursement use is not yet supported by both comparative evidence and a targeted value-relevant outcome."
+  } else if (decisionValue === "next_development") {
+    supported = /go.?no.?go|decision threshold|advance|development decision|feasibility|proof of concept|signal threshold|stage gate/.test(combinedText)
+    supportDescription = "The concept includes an explicit threshold or criterion for the next development decision."
+    missingDescription = "The next-development decision lacks an explicit success, feasibility, or go/no-go criterion."
+  } else {
+    supported =
+      Boolean((study.customDecisionEnabled || "").trim()) &&
+      Boolean((study.primaryObjective || "").trim()) &&
+      Boolean(splitStructuredEditorItems(getResolvedOutcomes(study))[0])
+    supportDescription = "The custom decision category is linked to a primary objective and endpoint."
+    missingDescription = "The custom decision needs a named category, focused primary objective, and primary endpoint."
+  }
+
+  const secondaryPrefix =
+    role === "secondary"
+      ? "Secondary decisions should reuse primary data wherever possible. "
+      : ""
+
+  return {
+    id: role === "primary" ? "primary-decision-fit" : `secondary-decision-${decisionValue}`,
+    label: `${role === "primary" ? "Primary" : "Secondary"} decision evidence: ${label}`,
+    status: supported ? "aligned" : "needs_justification",
+    finding: supported ? supportDescription : missingDescription,
+    action: supported
+      ? role === "primary"
+        ? "Protect these elements as the minimum decision-critical evidence set."
+        : "Treat this as supported by the existing design; do not add parallel endpoints or assessments without a specific gap."
+      : role === "primary"
+        ? "Resolve this evidence gap before adding lower-priority objectives or exploratory collection."
+        : `${secondaryPrefix}Add one targeted element only if it materially changes this secondary decision; otherwise mark the decision as unsupported by this study.`,
+  }
+}
+
+function buildProtocolGuardrailReconciliationGroups(
+  study: StudyForm,
+  stats: StatsForm,
+  schedule: ScheduleForm,
+  checks: ProtocolGuardrailCheck[],
+  profile: ProtocolGuardrailProfile,
+  impactAssessment: ImpactAssessment,
+): ProtocolGuardrailReconciliationGroup[] {
+  const applicability = getProtocolGuardrailApplicability(study)
+  const directPed = applicability === "applies"
+  const externalRequirements = applicability === "external_requirements"
+  const checksById = new Map(checks.map((check) => [check.id, check]))
+  const primaryDecision = getPrimaryDecisionLabel(study) || "Primary decision not defined"
+  const secondaryDecisions = getSecondaryDecisionLabels(study)
+  const primaryObjective = (study.primaryObjective || "").trim()
+  const secondaryObjectives = splitGuardrailSecondaryObjectives(study.secondaryObjectives || "")
+  const endpoints = splitGuardrailEndpointItems(getResolvedOutcomes(study))
+  const objectiveCount = (primaryObjective ? 1 : 0) + secondaryObjectives.length
+  const objectiveTarget = getGuardrailObjectiveTarget(profile)
+  const endpointTarget = getGuardrailEndpointTarget(profile)
+  const exploratoryCheck = checksById.get("exploratory")
+  const objectiveDestination = getProtocolGuardrailDestinations("objectives")
+  const endpointDestination = getProtocolGuardrailDestinations("endpoints")
+  const impactNarrative = [
+    impactAssessment.executiveSummary,
+    ...impactAssessment.blockers,
+    ...impactAssessment.strengthenActions,
+  ].join(" ")
+  const impactFlagsObjectiveBloat =
+    directPed &&
+    /objective(?: and endpoint)? bloat|too many objectives|streamline to .{0,20}objectives/i.test(impactNarrative)
+  const impactFlagsEndpointBloat =
+    directPed &&
+    /endpoint(?: and objective)? bloat|endpoint package|too many endpoints|numerous .{0,25}endpoint|streamline to .{0,30}endpoints/i.test(
+      impactNarrative,
+    )
+  const selectedDecisionLink = secondaryDecisions.length
+    ? `${primaryDecision}; secondary: ${secondaryDecisions.join(", ")}`
+    : primaryDecision
+  const objectivePackageRecommendation: ProtocolGuardrailItemRecommendation =
+    objectiveCount === 0
+      ? "align"
+      : directPed && (objectiveCount > objectiveTarget || impactFlagsObjectiveBloat)
+        ? "simplify"
+        : "retain"
+
+  const objectiveItems: ProtocolGuardrailReconciliationItem[] = [
+    {
+      id: "objectives-package",
+      element: `Objective package: ${objectiveCount} atomic objective${objectiveCount === 1 ? "" : "s"}`,
+      role: "Package-level judgment",
+      linkedTo: selectedDecisionLink,
+      recommendation: objectivePackageRecommendation,
+      rationale:
+        objectiveCount === 0
+          ? "Define the primary objective before evaluating the supporting objective package."
+          : directPed && objectiveCount > objectiveTarget
+            ? `The package exceeds the focused target of ${objectiveTarget}. Compound objectives have been separated so each scientific question must earn its place.`
+            : impactFlagsObjectiveBloat
+              ? "The evidence-impact assessment identifies objective burden that may weaken decision focus; simplify before retaining individual supporting questions."
+              : externalRequirements
+                ? `${objectiveCount} atomic objectives are documented. Trace each objective to a regulatory, HTA, safety, claim, or decision requirement and review overlap where distinct requirements are not visible.`
+                : applicability === "general_complexity"
+                  ? `${objectiveCount} atomic objectives are documented. No PED numerical target has been applied; use the count descriptively and confirm the purpose and owner of each objective.`
+                  : `The package is within the focused target of ${objectiveTarget} atomic objectives.`,
+      destinations: objectiveDestination,
+    },
+    {
+      id: "objective-primary",
+      element: primaryObjective || "Primary objective not defined",
+      role: "Primary objective",
+      linkedTo: primaryDecision,
+      recommendation: primaryObjective && getPrimaryDecisionLabel(study) ? "retain" : "align",
+      rationale: primaryObjective
+        ? getPrimaryDecisionLabel(study)
+          ? "This is the principal scientific question supporting the primary decision."
+          : "The scientific question is present, but the decision it must enable is not yet defined."
+        : "A focused, testable primary objective is required before endpoint and estimand reconciliation.",
+      destinations: objectiveDestination,
+    },
+    ...secondaryObjectives.map((objective, index) => {
+      const lower = objective.text.toLowerCase()
+      const hasExploratoryWording = /exploratory|biomarker|subgroup|omics|mechanistic|hypothesis/.test(lower)
+      const hasStrategicWording =
+        /support (?:hta|market access|label|publication|uptake)|inform guideline|defend market share|accelerate uptake/.test(lower)
+      const exceedsFocusedSet = directPed && index >= Math.max(0, objectiveTarget - 1)
+      let recommendation: ProtocolGuardrailItemRecommendation = "retain"
+      let rationale = objective.compound
+        ? directPed
+          ? `This atomic question was separated from compound secondary objective ${objective.sourceIndex + 1}; retain it only if it independently supports the selected decision.`
+          : `This atomic question was separated from compound secondary objective ${objective.sourceIndex + 1}. Confirm its distinct requirement, scientific purpose, and linked endpoint.`
+        : externalRequirements
+          ? "Confirm the documented external requirement or decision role and its linked endpoint."
+          : applicability === "general_complexity"
+            ? "Confirm the objective's distinct purpose, owner, and linked endpoint."
+            : "This objective remains within the focused supporting objective package."
+
+      if (hasStrategicWording) {
+        recommendation = "align"
+        rationale = "Rewrite this as a testable scientific question; strategic or communication intent should not substitute for an objective."
+      } else if (hasExploratoryWording) {
+        recommendation = getProtocolGuardrailItemRecommendationFromCheck(exploratoryCheck, "align")
+        rationale = exploratoryCheck?.finding || "Its decision role, analysis, and consequence require clarification."
+      } else if (exceedsFocusedSet) {
+        recommendation = "simplify"
+        rationale = "This sits beyond the focused objective set; retain only if it materially changes a selected decision."
+      }
+
+      return {
+        id: `objective-secondary-${objective.sourceIndex}-${objective.partIndex}`,
+        element: objective.text,
+        role: objective.compound
+          ? `Secondary objective ${objective.sourceIndex + 1}.${objective.partIndex + 1}`
+          : `Secondary objective ${objective.sourceIndex + 1}`,
+        linkedTo: secondaryDecisions[objective.sourceIndex] || primaryDecision,
+        recommendation,
+        rationale,
+        destinations: objectiveDestination,
+      }
+    }),
+  ]
+
+  const objectiveCandidates = objectiveItems.filter((item) => item.id !== "objectives-package")
+  const endpointPackageNeedsSimplification =
+    directPed &&
+    (endpoints.length > endpointTarget || impactFlagsEndpointBloat || objectivePackageRecommendation === "simplify")
+  const survivalFamilyCount = endpoints.filter((endpoint) =>
+    /\boverall survival\b|\bos\b|\bprogression[- ]free survival\b|\bpfs\b|\bpfs2\b|post[- ]progression survival|time to (?:subsequent|next) treatment|treatment failure/i.test(
+      endpoint.text,
+    ),
+  ).length
+  const keySecondaryCount = endpoints.filter((endpoint) => endpoint.role === "key_secondary").length
+  const multiplicityStrategyVisible = /multiplicity|hierarch(?:y|ical)|gatekeep|alpha allocation|type i error/i.test(
+    `${stats.analysisModel} ${stats.rationale} ${stats.hypothesis}`,
+  )
+  const endpointPackageMultiplicityReview =
+    externalRequirements && keySecondaryCount > 3 && !multiplicityStrategyVisible
+  const hasOrrEndpoint = endpoints.some((endpoint) => /\boverall response rate\b|\bobjective response rate\b|\borr\b/i.test(endpoint.text))
+  const hasDorEndpoint = endpoints.some((endpoint) => /\bduration of response\b|\bdor\b/i.test(endpoint.text))
+  const hasPfsEndpoint = endpoints.some((endpoint) => /\bprogression[- ]free survival\b|\bpfs\b/i.test(endpoint.text))
+  const sequenceDecisionSelected = [study.primaryDecisionEnabled, ...(study.secondaryDecisionsEnabled || [])].includes(
+    "treatment_sequencing",
+  )
+  const phaseTwoStudy = /phase 2/i.test(study.developmentStage || "")
+  const osPowerEvidence = /\boverall survival\b|\bos\b/i.test(
+    `${stats.endpointType} ${stats.hypothesis} ${stats.effectSize} ${stats.analysisModel} ${study.sampleSize}`,
+  )
+  const extendedSurvivalFollowUp = /extended (?:os|survival)|long[- ]term (?:os|survival)|survival follow[- ]?up|several years/i.test(
+    study.timeline || "",
+  )
+
+  const endpointRows: ProtocolGuardrailReconciliationItem[] = endpoints.map((endpoint, index) => {
+        const lower = endpoint.text.toLowerCase()
+        const isExploratory = endpoint.role === "exploratory" || /exploratory|hypothesis|mechanistic|omics/.test(lower)
+        const isSafety = /adverse|safety|toxicity|tolerability|sae|aesi/.test(lower)
+        const isPrimary = endpoint.role === "primary"
+        const isKeySecondary = endpoint.role === "key_secondary"
+        const isOverallSurvival = /\boverall survival\b|\bos\b/i.test(endpoint.text)
+        const isOrr = /\boverall response rate\b|\bobjective response rate\b|\borr\b/i.test(endpoint.text)
+        const isDor = /\bduration of response\b|\bdor\b/i.test(endpoint.text)
+        const isDcr = /\bdisease control rate\b|\bdcr\b/i.test(endpoint.text)
+        const isResponseDepthOrTiming = /depth.{0,12}response|timing.{0,12}response|time to response/i.test(endpoint.text)
+        const isDuplicativeSurvivalMeasure =
+          /\bpfs2\b|post[- ]progression survival|time to (?:subsequent|next) treatment|treatment failure/i.test(endpoint.text)
+        let linkedObjectiveItem = isPrimary ? objectiveCandidates[0] : undefined
+
+        if (!linkedObjectiveItem) {
+          let bestOverlap = 0
+          objectiveCandidates.forEach((objective) => {
+            const overlap = getGuardrailConceptOverlap(endpoint.text, objective.element)
+            if (overlap > bestOverlap) {
+              bestOverlap = overlap
+              linkedObjectiveItem = objective
+            }
+          })
+          if (bestOverlap === 0) linkedObjectiveItem = undefined
+        }
+
+        const linkedObjective = linkedObjectiveItem?.element || (isSafety ? "Essential safety" : "Objective link not explicit")
+        let role = isPrimary
+          ? "Primary endpoint"
+          : isSafety
+            ? "Safety endpoint"
+            : isExploratory
+              ? "Exploratory endpoint"
+              : isKeySecondary
+                ? "Key secondary endpoint"
+                : endpoint.role === "secondary"
+                  ? "Secondary endpoint"
+                  : "Supporting endpoint"
+        let recommendation: ProtocolGuardrailItemRecommendation = "retain"
+        let rationale = `Supports ${compactDecisionContext(linkedObjective, 120)}.`
+        let sourceCheck: ProtocolGuardrailCheck | undefined
+
+        if (/biomarker|biospecimen|biopsy|ctdna|genomic|molecular|mutation|expression/.test(lower)) {
+          sourceCheck = checksById.get("biomarkers")
+        } else if (/\bpro\b|patient[- ]reported|\bcoa\b|quality of life|\bqol\b|symptom|functioning|questionnaire/.test(lower)) {
+          sourceCheck = checksById.get("pro-coa")
+        } else if (/\bpk\b|\bpd\b|pk\/pd|pharmacokinetic|pharmacodynamic|exposure[- ]response|drug concentration/.test(lower)) {
+          sourceCheck = checksById.get("pk-pd")
+        } else if (isExploratory) {
+          sourceCheck = exploratoryCheck
+        } else if (/central imaging|bicr|serial imaging|ct\/mri|mri|pet|bone scan|ecg|wearable|digital endpoint/.test(lower)) {
+          sourceCheck = checksById.get("special-assessments")
+        }
+
+        if (sourceCheck) {
+          recommendation = getProtocolGuardrailItemRecommendationFromCheck(sourceCheck)
+          rationale = sourceCheck.finding
+        }
+
+        if (!linkedObjectiveItem && !isPrimary && !isSafety && recommendation === "retain") {
+          recommendation = "align"
+          rationale = "No explicit retained objective currently supports this endpoint. Link it to a decision-relevant objective or remove it."
+        }
+
+        if (linkedObjectiveItem?.recommendation === "remove" && !isPrimary && !isSafety) {
+          recommendation = directPed ? "remove" : "align"
+          rationale = directPed
+            ? `Its linked objective is recommended for removal: ${compactDecisionContext(linkedObjectiveItem.element, 120)}.`
+            : `Its linked objective lacks a documented distinct requirement: ${compactDecisionContext(linkedObjectiveItem.element, 120)}. Confirm traceability before changing the endpoint.`
+        } else if (linkedObjectiveItem?.recommendation === "simplify" && !isPrimary && !isSafety) {
+          recommendation = directPed ? (recommendation === "remove" ? "remove" : "simplify") : "align"
+          rationale = directPed
+            ? `Its linked objective is outside the focused objective package and must be simplified first: ${compactDecisionContext(linkedObjectiveItem.element, 120)}.`
+            : `Confirm the distinct requirement and endpoint role for the linked objective: ${compactDecisionContext(linkedObjectiveItem.element, 120)}.`
+        } else if (linkedObjectiveItem?.recommendation === "align" && recommendation === "retain" && !isSafety) {
+          recommendation = "align"
+          rationale = `Clarify the linked objective before retaining this endpoint: ${compactDecisionContext(linkedObjectiveItem.element, 120)}.`
+        }
+
+        if (directPed && index >= endpointTarget && !isPrimary && !isSafety) {
+          recommendation = isExploratory || /pk|pd|biomarker|biospecimen|utilization/.test(lower) ? "remove" : "simplify"
+          rationale = `The atomic endpoint package exceeds the focused target of ${endpointTarget}. Retain this item only if it materially changes the selected decision.`
+        }
+
+        if (isOverallSurvival && !isPrimary) {
+          if (/landmark|multiple/.test(lower) || extendedSurvivalFollowUp || (phaseTwoStudy && !osPowerEvidence)) {
+            recommendation = directPed ? "simplify" : "align"
+            rationale = directPed
+              ? "Keep one prespecified supportive OS definition/readout only if vital-status follow-up is already planned. Multiple landmarks or extended follow-up require explicit power, timing, cost, and decision justification."
+              : "Multiple OS landmarks or extended follow-up add material duration and cost. Document the regulatory, HTA, claim, safety, or decision requirement, event and power assumptions, analysis timing, and consequence for each readout."
+          } else if (!linkedObjectiveItem) {
+            recommendation = "align"
+            rationale = "Clarify whether OS is supportive context or a decision-critical endpoint, including follow-up duration and analysis timing."
+          }
+        }
+
+        if (isDuplicativeSurvivalMeasure && survivalFamilyCount > 2 && !sequenceDecisionSelected) {
+          recommendation = directPed ? (endpointPackageNeedsSimplification ? "remove" : "simplify") : "align"
+          rationale = directPed
+            ? "This overlaps with a crowded survival and post-progression package. Retain only one or two measures that can change treatment placement or interpretation; sequencing is not a selected decision."
+            : "This may overlap with other survival or post-progression measures. Document its distinct claim, authority request, or decision consequence and confirm that the analyses are not duplicative."
+        }
+
+        if (isOrr && !isPrimary) {
+          recommendation = recommendation === "retain" ? "retain" : recommendation
+          rationale = hasPfsEndpoint
+            ? "ORR provides tumor-response evidence that is distinct from the time-to-event primary outcome. Confirm whether it supports a prespecified claim, response interpretation, or authority request."
+            : "ORR provides a response-based efficacy measure. Confirm its distinct claim or decision role and the assessment standard before treating it as key secondary evidence."
+        }
+
+        if (isDor && !isPrimary) {
+          rationale = hasOrrEndpoint
+            ? "DoR is a dependent supportive measure evaluated among responders and should be interpreted with ORR. Confirm that the response package and follow-up timing support a distinct claim or authority request."
+            : "DoR depends on a clearly defined response endpoint and responder population. Add or identify that response definition before treating DoR as interpretable supportive evidence."
+          if (!hasOrrEndpoint) recommendation = "align"
+        }
+
+        if (isDcr && !isPrimary && (hasOrrEndpoint || hasPfsEndpoint)) {
+          recommendation = "align"
+          rationale =
+            "DCR may overlap with ORR and PFS by combining response and stable disease. Define the incremental claim or decision contribution, assessment timepoint, and threshold before treating it as distinct key secondary evidence."
+        }
+
+        if (isResponseDepthOrTiming && !isPrimary && (hasOrrEndpoint || hasDorEndpoint)) {
+          recommendation = "align"
+          rationale =
+            "Depth or timing of response may overlap with ORR and DoR. Confirm whether it answers a distinct objective or can be handled within one prespecified response-analysis package."
+        }
+
+        if (isPrimary && recommendation === "remove") {
+          recommendation = "align"
+          rationale = "A primary endpoint cannot be removed without redefining the primary objective and decision; correct the alignment first."
+        }
+
+        return {
+          id: `endpoint-${index}`,
+          element: endpoint.text,
+          role,
+          linkedTo: compactDecisionContext(linkedObjective, 120),
+          recommendation,
+          rationale,
+          destinations: sourceCheck?.destinations?.length ? sourceCheck.destinations : endpointDestination,
+        }
+      })
+
+  const endpointItems: ProtocolGuardrailReconciliationItem[] = endpoints.length
+    ? [
+        {
+          id: "endpoints-package",
+          element: `Endpoint package: ${endpoints.length} atomic endpoint${endpoints.length === 1 ? "" : "s"}`,
+          role: "Package-level judgment",
+          linkedTo: `${objectiveCount} atomic objective${objectiveCount === 1 ? "" : "s"}`,
+          recommendation: endpointPackageNeedsSimplification || endpointPackageMultiplicityReview ? "simplify" : "retain",
+          rationale: endpointPackageNeedsSimplification
+            ? `The package exceeds the focused target of ${endpointTarget}, inherits objective-package complexity, or is flagged by the impact assessment. Essential primary and safety endpoints remain protected; supporting endpoints must be prioritized.`
+            : endpointPackageMultiplicityReview
+              ? `${keySecondaryCount} key secondary endpoints are identified without a visible multiplicity, hierarchy, gatekeeping, or alpha-allocation strategy. Confirm which endpoints are inferential, descriptive, or externally requested and how claim error will be controlled.`
+            : externalRequirements
+              ? `${endpoints.length} atomic endpoints are documented. Trace each endpoint to an objective and a regulatory, HTA, safety, claim, or decision requirement; review potential duplication separately.`
+              : applicability === "general_complexity"
+                ? `${endpoints.length} atomic endpoints are documented. No PED numerical target has been applied; use the count descriptively and verify objective linkage, purpose, and timing.`
+                : `The atomic endpoint package is within the focused target of ${endpointTarget}. Each endpoint must still have an explicit retained objective.`,
+          destinations: endpointDestination,
+        },
+        ...endpointRows,
+      ]
+    : [
+        {
+          id: "endpoint-missing",
+          element: "Primary endpoint not defined",
+          role: "Primary endpoint",
+          linkedTo: primaryObjective || "Primary objective not defined",
+          recommendation: "align",
+          rationale: "Define one decision-relevant primary endpoint before adding supporting or exploratory endpoints.",
+          destinations: endpointDestination,
+        },
+      ]
+
+  const comparatorCheck = checksById.get("comparator")
+  const eligibilityCheck = checksById.get("eligibility")
+  const comparator = (study.topComparator || study.comparator || "").trim()
+  const population = (study.population || getResolvedIndication(study) || "").trim()
+  const designOverview = (study.designOverview || "").trim()
+  const eligibilityItems = splitStructuredEditorItems(study.eligibility || "")
+  const designItems: ProtocolGuardrailReconciliationItem[] = [
+    {
+      id: "design-overview",
+      element: designOverview || "Study design overview not defined",
+      role: "Design",
+      linkedTo: primaryDecision,
+      recommendation: designOverview ? "retain" : "align",
+      rationale: designOverview
+        ? "The design provides the framework needed to answer the primary objective."
+        : "Define the minimum design structure required for credible and interpretable evidence.",
+      destinations: getProtocolGuardrailDestinations("primary-decision-fit"),
+    },
+    {
+      id: "design-comparator",
+      element: comparator || "Comparator or benchmark not defined",
+      role: "Comparator",
+      linkedTo: primaryObjective || primaryDecision,
+      recommendation: comparator || study.category !== "interventional" ? "retain" : "align",
+      rationale: comparatorCheck?.finding || "Comparator logic should match the primary decision and endpoint interpretation.",
+      destinations: comparatorCheck?.destinations || getProtocolGuardrailDestinations("comparator"),
+    },
+    {
+      id: "design-population",
+      element: population || "Target population not defined",
+      role: "Population",
+      linkedTo: primaryDecision,
+      recommendation: population ? "retain" : "align",
+      rationale: population
+        ? "The target population anchors applicability and interpretation."
+        : "Define the population before assessing applicability, eligibility burden, or patient-selection claims.",
+      destinations: getProtocolGuardrailDestinations("eligibility"),
+    },
+    {
+      id: "design-eligibility",
+      element: eligibilityItems.length
+        ? `${eligibilityItems.length} structured eligibility item${eligibilityItems.length === 1 ? "" : "s"}`
+        : "Eligibility criteria not structured",
+      role: "Eligibility",
+      linkedTo: "Safety and interpretability",
+      recommendation: eligibilityItems.length
+        ? getProtocolGuardrailItemRecommendationFromCheck(eligibilityCheck)
+        : "align",
+      rationale: eligibilityCheck?.finding || "Eligibility should be inclusive and limited to safety or interpretability-critical criteria.",
+      destinations: eligibilityCheck?.destinations || getProtocolGuardrailDestinations("eligibility"),
+    },
+  ]
+
+  const dataCollectionDefinitions = [
+    {
+      checkId: "pro-coa",
+      element: "PRO / COA collection",
+      role: "Patient-reported data",
+      linkedTo: "Patient-relevant interpretation",
+      endpointPattern: /\bpro\b|patient[- ]reported|\bcoa\b|quality of life|\bqol\b|symptom|functioning|questionnaire/i,
+    },
+    {
+      checkId: "pk-pd",
+      element: "PK / PD or exposure-response collection",
+      role: "Special data collection",
+      linkedTo: "Dose, safety, or bridging decision",
+      endpointPattern: /\bpk\b|\bpd\b|pk\/pd|pharmacokinetic|pharmacodynamic|exposure[- ]response|drug concentration/i,
+    },
+    {
+      checkId: "biomarkers",
+      element: "Biomarkers / biospecimens",
+      role: "Special data collection",
+      linkedTo: selectedDecisionLink,
+      endpointPattern: /biomarker|biospecimen|biopsy|ctdna|genomic|molecular|mutation|expression/i,
+    },
+    {
+      checkId: "special-assessments",
+      element: "Special assessments",
+      role: "Imaging, ECG, labs, wearables, or remote checks",
+      linkedTo: "Endpoint, safety, or feasibility",
+      endpointPattern: /central imaging|bicr|serial imaging|ct\/mri|mri|pet|bone scan|ecg|wearable|digital endpoint/i,
+    },
+  ]
+  const recommendationSeverity: Record<ProtocolGuardrailItemRecommendation, number> = {
+    retain: 0,
+    align: 1,
+    simplify: 2,
+    remove: 3,
+  }
+  const dataCollectionItems = dataCollectionDefinitions.flatMap((definition) => {
+    const check = checksById.get(definition.checkId)
+    if (!check || /^No /.test(check.finding)) return []
+    const linkedEndpointRows = endpointRows.filter((endpoint) => definition.endpointPattern.test(endpoint.element))
+    const linkedEndpointRecommendation = linkedEndpointRows.reduce<ProtocolGuardrailItemRecommendation | null>(
+      (current, endpoint) =>
+        !current || recommendationSeverity[endpoint.recommendation] > recommendationSeverity[current]
+          ? endpoint.recommendation
+          : current,
+      null,
+    )
+    const checkRecommendation = getProtocolGuardrailItemRecommendationFromCheck(check)
+    const recommendation =
+      linkedEndpointRecommendation &&
+      recommendationSeverity[linkedEndpointRecommendation] > recommendationSeverity[checkRecommendation]
+        ? linkedEndpointRecommendation
+        : checkRecommendation
+    const rationale =
+      linkedEndpointRecommendation && linkedEndpointRecommendation !== "retain"
+        ? directPed
+          ? `The linked endpoint is recommended to ${getProtocolGuardrailItemRecommendationLabel(linkedEndpointRecommendation).toLowerCase()}; its data collection must follow the same decision unless another retained endpoint independently requires it.`
+          : "The linked endpoint has an unresolved requirement, alignment, proportionality, or overlap signal. Document whether this collection has an independent requirement before changing it."
+        : check.finding
+
+    return [
+      {
+        id: `data-${definition.checkId}`,
+        element: definition.element,
+        role: definition.role,
+        linkedTo: definition.linkedTo,
+        recommendation,
+        rationale,
+        destinations: check.destinations || [],
+      } satisfies ProtocolGuardrailReconciliationItem,
+    ]
+  })
+
+  const timelineCheck = checksById.get("duration")
+  const specialAssessmentCheck = checksById.get("special-assessments")
+  const geographyAssessment = assessGeographyFootprint(study, applicability)
+  const osEndpointRecommendation = endpointRows.find((endpoint) =>
+    /\boverall survival\b|\bos\b/i.test(endpoint.element),
+  )?.recommendation
+  const timingItems: ProtocolGuardrailReconciliationItem[] = [
+    {
+      id: "timing-duration",
+      element: (study.timeline || "").trim() || "Study duration and follow-up not defined",
+      role: "Duration / follow-up",
+      linkedTo: endpoints[0]?.text || "Primary endpoint maturity",
+      recommendation: !(study.timeline || "").trim()
+        ? "align"
+        : extendedSurvivalFollowUp &&
+            (timelineCheck?.status !== "aligned" || (osEndpointRecommendation && osEndpointRecommendation !== "retain"))
+          ? directPed
+            ? "simplify"
+            : "align"
+          : "retain",
+      rationale:
+        extendedSurvivalFollowUp &&
+        (timelineCheck?.status !== "aligned" || (osEndpointRecommendation && osEndpointRecommendation !== "retain"))
+          ? directPed
+            ? "Extended OS follow-up can materially increase study duration, site maintenance, data cleaning, and survival-status tracking cost. Shorten or separate it unless a retained, adequately powered OS objective requires it."
+            : "Extended OS follow-up can materially increase duration, site maintenance, data cleaning, and survival-status tracking cost. Document the authority, claim, HTA, safety, or decision requirement, event assumptions, analysis timing, and governance owner."
+          : timelineCheck?.finding || "Timing must support endpoint maturity without unnecessary follow-up.",
+      destinations: timelineCheck?.destinations || getProtocolGuardrailDestinations("duration"),
+    },
+    {
+      id: "timing-sample-size",
+      element: (study.sampleSize || "").trim() || "Sample-size planning input not defined",
+      role: "Sample size / event logic",
+      linkedTo: endpoints[0]?.text || primaryObjective || primaryDecision,
+      recommendation: (study.sampleSize || "").trim() ? "retain" : "align",
+      rationale: (study.sampleSize || "").trim()
+        ? "The planning input should remain consistent with the primary endpoint and estimand."
+        : "Add a planning assumption or complete the estimate in PICO & Stats before final design reconciliation.",
+      destinations: [
+        { label: "Timeline & sample size", tab: "study", sectionId: "study-timing" },
+        { label: "PICO & Stats", tab: "pico", sectionId: "pico-statistics" },
+      ],
+    },
+  ]
+
+  if ((study.geography || "").trim()) {
+    timingItems.push({
+      id: "operations-geography",
+      element: study.geography.trim(),
+      role: "Geography / operating footprint",
+      linkedTo: "Recruitment, external validity, access, and operational feasibility",
+      recommendation: geographyAssessment.footprintRecommendation,
+      rationale: geographyAssessment.footprintRationale,
+      destinations: [{ label: "Timeline & geography", tab: "study", sectionId: "study-timing" }],
+    })
+  }
+
+  if (geographyAssessment.postTrialAccessAssessmentNeeded) {
+    timingItems.push({
+      id: "operations-post-trial-access",
+      element: "Post-trial access / continued-treatment obligations",
+      role: "Country-level obligation and cost assessment",
+      linkedTo: "Country selection, treatment discontinuation, supply, monitoring, and study close-out",
+      recommendation: geographyAssessment.postTrialAccessRecommendation,
+      rationale: geographyAssessment.postTrialAccessRationale,
+      destinations: [{ label: "Timeline & geography", tab: "study", sectionId: "study-timing" }],
+    })
+  }
+
+  if (isScheduleEligibleStudy(study)) {
+    const scheduleReady = schedule.columns.length > 0 && schedule.rows.length > 0
+    const scheduleRecommendation: ProtocolGuardrailItemRecommendation = !scheduleReady
+      ? "align"
+      : specialAssessmentCheck?.status === "consider_simplifying"
+        ? "simplify"
+        : specialAssessmentCheck?.status === "needs_justification"
+          ? "align"
+          : "retain"
+    timingItems.push({
+      id: "operations-soa",
+      element: scheduleReady
+        ? `${schedule.rows.length} activities across ${schedule.columns.length} visit columns`
+        : "Schedule of Activities not generated",
+      role: "SoA burden",
+      linkedTo: "Endpoint timing, safety, and feasibility",
+      recommendation: scheduleRecommendation,
+      rationale: scheduleReady
+        ? "Use the leanest visit and assessment cadence that preserves endpoint timing, essential safety, and data quality."
+        : "Generate the SoA after objectives and endpoints are reconciled, then review visit and assessment burden.",
+      destinations: [{ label: "Schedule of Activities", tab: "schedule", sectionId: "schedule-activities" }],
+    })
+  }
+
+  return [
+    {
+      id: "objectives",
+      label: "Objectives",
+      description: "Each objective must support a selected decision and remain scientifically testable.",
+      items: objectiveItems,
+    },
+    {
+      id: "endpoints",
+      label: "Endpoints",
+      description: "Each endpoint must link to an objective and earn its collection and analysis burden.",
+      items: endpointItems,
+    },
+    {
+      id: "design-population",
+      label: "Design and population",
+      description: "Retain the minimum design safeguards needed for credible and applicable evidence.",
+      items: designItems,
+    },
+    ...(dataCollectionItems.length
+      ? [
+          {
+            id: "data-collection",
+            label: "Data collection",
+            description: "Special collection is retained only when its decision, endpoint, safety, or feasibility role is explicit.",
+            items: dataCollectionItems,
+          },
+        ]
+      : []),
+    {
+      id: "timing-operations",
+      label: "Timing and operations",
+      description: "Reconcile follow-up, sample size, geography, and SoA burden after the evidence chain is defined.",
+      items: timingItems,
+    },
+  ]
+}
+
+function buildProtocolGuardrailAssessment(
+  study: StudyForm,
+  stats: StatsForm,
+  schedule: ScheduleForm,
+  impactAssessment: ImpactAssessment,
+): ProtocolGuardrailAssessment {
   const profile = getResolvedProtocolGuardrailProfile(study)
-  const objectiveCount =
-    (study.primaryObjective || "").trim() ? 1 + splitStructuredEditorItems(study.secondaryObjectives || "").length : 0
-  const endpointCount = splitStructuredEditorItems(getResolvedOutcomes(study)).length
+  const applicability = getProtocolGuardrailApplicability(study)
+  const directPed = applicability === "applies"
+  const externalRequirements = applicability === "external_requirements"
+  const evidenceRole = getResolvedStudyEvidenceRole(study)
+  const evidenceRoleLabel = getStudyEvidenceRoleLabel(study)
+  const primaryObjective = (study.primaryObjective || "").trim()
+  const endpointItems = splitGuardrailEndpointItems(getResolvedOutcomes(study))
+  const objectiveCount = primaryObjective ? 1 + splitGuardrailSecondaryObjectives(study.secondaryObjectives || "").length : 0
+  const endpointCount = endpointItems.length
+  const keySecondaryEndpointCount = endpointItems.filter((endpoint) => endpoint.role === "key_secondary").length
+  const endpointMultiplicityStrategyVisible = /multiplicity|hierarch(?:y|ical)|gatekeep|alpha allocation|type i error/i.test(
+    `${stats.analysisModel} ${stats.rationale} ${stats.hypothesis}`,
+  )
+  const endpointMultiplicityNeedsReview =
+    externalRequirements && keySecondaryEndpointCount > 3 && !endpointMultiplicityStrategyVisible
+  const objectiveTarget = getGuardrailObjectiveTarget(profile)
+  const endpointTarget = getGuardrailEndpointTarget(profile)
+  const hasExtendedSurvivalFollowUp = /extended (?:os|survival)|long[- ]term (?:os|survival)|survival follow[- ]?up|several years/i.test(
+    study.timeline || "",
+  )
+  const hasOsPowerEvidence = /\boverall survival\b|\bos\b/i.test(
+    `${stats.endpointType} ${stats.hypothesis} ${stats.effectSize} ${stats.analysisModel} ${study.sampleSize}`,
+  )
+  const extendedOsNeedsSimplification = hasExtendedSurvivalFollowUp && !hasOsPowerEvidence
   const eligibilityCount = splitStructuredEditorItems(study.eligibility || "").length
   const hasTimeline = Boolean((study.timeline || "").trim())
   const hasComparator = Boolean(((study.topComparator || "").trim() || (study.comparator || "").trim()))
-  const hasExploratoryLanguage = /exploratory|biomarker|subgroup|omics|mechanistic/i.test(getResolvedOutcomes(study))
-  const maxEndpointTarget = Math.max(2, Math.min(10, Math.max(1, objectiveCount || 1) * 2))
-  const lateStageOrPostMarketing = /phase 3|phase 4|post-marketing|lifecycle/i.test(study.developmentStage || "")
+  const primaryDecision = isPrimaryDecisionValue(study.primaryDecisionEnabled) ? study.primaryDecisionEnabled : ""
+  const secondaryDecisions = (study.secondaryDecisionsEnabled || []).filter(
+    (value) => isPrimaryDecisionValue(value) && value !== primaryDecision,
+  )
+  const decisionIntent = getDecisionStatement(study)
+  const hasDecisionIntent = Boolean(primaryDecision)
+  const estimand = (stats.estimand || "").trim()
+  const resolvedOutcomeText = getResolvedOutcomes(study)
+  const hasExploratoryLanguage = /exploratory|biomarker|subgroup|omics|mechanistic/i.test(resolvedOutcomeText)
+  const hasExplicitExploratoryLanguage = /exploratory|omics|mechanistic/i.test(resolvedOutcomeText)
+  const hasPrespecifiedExploratoryLink =
+    /prespecified|pre-specified|interaction|decision rule|threshold/i.test(
+      `${study.primaryObjective} ${study.secondaryObjectives} ${resolvedOutcomeText} ${stats.analysisModel} ${stats.rationale}`,
+    )
+  const decisionSet = [primaryDecision, ...secondaryDecisions]
+  const exploratoryCanSupportDecision = decisionSet.some((decision) =>
+    ["patient_selection", "dose_regimen", "next_development"].includes(decision),
+  )
+  const exploratoryAlignmentStatus: ProtocolGuardrailAlignmentStatus = !hasExploratoryLanguage
+    ? "aligned"
+    : exploratoryCanSupportDecision && hasPrespecifiedExploratoryLink && !hasExplicitExploratoryLanguage
+      ? "aligned"
+      : exploratoryCanSupportDecision
+        ? "partially_aligned"
+        : "not_aligned"
+  const exploratoryRecommendedAction: ProtocolGuardrailRecommendedAction = !hasExploratoryLanguage
+    ? "keep"
+    : exploratoryAlignmentStatus === "aligned"
+      ? "keep"
+      : exploratoryCanSupportDecision
+        ? "align"
+        : directPed
+          ? "remove"
+          : "align"
+  const exploratoryPreferredAction =
+    !hasExploratoryLanguage
+      ? "Avoid adding exploratory readouts unless they clearly support a selected decision."
+      : exploratoryAlignmentStatus === "aligned"
+        ? "Keep the prespecified decision-supporting element. In Research objectives and Endpoints & assessments, keep its role, endpoint, timepoint, analysis, and decision consequence explicit."
+        : decisionSet.includes("patient_selection")
+          ? "In Decision framing, retain Patient selection as the linked decision. Then define the patient-selection variable or subgroup in Research objectives and specify its endpoint, timepoint, interaction analysis, and decision consequence in Endpoints & assessments. Remove unrelated mechanistic measures."
+          : decisionSet.includes("dose_regimen")
+            ? "In Decision framing, retain Dose or regimen as the linked decision. Then limit Research objectives and Endpoints & assessments to the prespecified exposure-response or mechanistic evidence required for that decision, with a defined endpoint, analysis, and threshold."
+            : decisionSet.includes("next_development")
+              ? "In Decision framing, retain Next-development as the linked decision. Then define the exact signal in Research objectives and its analysis and go/no-go or next-study threshold in Endpoints & assessments. Remove measures that cannot change that decision."
+              : directPed
+                ? "Remove these items from Endpoints & assessments and then from the Schedule of Activities. If one item can change a selected decision, first link it in Decision framing, then add an exact objective, endpoint, timepoint, analysis, and decision consequence before retaining collection."
+                : "Document the regulatory, HTA, safety, claim, or decision requirement for each item, including its objective, endpoint, timepoint, analysis, and consequence. Flag items with no distinct requirement as unresolved rather than presuming removal."
+  const exploratoryExceptionPath = hasExploratoryLanguage
+    ? "If alignment is not scientifically possible but the team still proposes retention, require an individual exception explaining the decision influenced, why core data are insufficient, the prespecified analysis, positive/negative/inconclusive consequences, added burden and cost, and confirmation that it is non-claim-supporting. Otherwise remove it."
+    : ""
+  const phaseTwoToFour = /phase 2|phase 3|phase 4|post-marketing/i.test(study.developmentStage || "")
   const specialAssessmentSignals = getSpecialAssessmentSignals(study)
+  const geographyAssessment = assessGeographyFootprint(study, applicability)
   const checks: ProtocolGuardrailCheck[] = []
 
-  if (profile === "practice_informing_ped") {
+  checks.push({
+    id: "decision-intent",
+    label: "Primary decision definition",
+    status: hasDecisionIntent ? "aligned" : "needs_justification",
+    finding: hasDecisionIntent
+      ? `Primary decision selected: ${getPrimaryDecisionLabel(study)}. Working interpretation: ${decisionIntent}`
+      : "The clinical, practice, guideline, access, regulatory, development, or safety decision this study must inform is not yet selected.",
+    action: hasDecisionIntent
+      ? "Use this interpretation to test whether every downstream objective, endpoint, and assessment is necessary. Override it only if the inferred action is materially inaccurate."
+      : "Select the primary decision before adding objectives, endpoints, or data collection.",
+  })
+
+  if (primaryDecision) {
+    checks.push(buildDecisionAdaptiveCheck(primaryDecision, study, stats, "primary"))
+  }
+
+  secondaryDecisions.forEach((decision) => {
+    checks.push(buildDecisionAdaptiveCheck(decision, study, stats, "secondary"))
+  })
+
+  if (profile === "ped_streamlined") {
     checks.push({
-      id: "stage-fit",
-      label: "Development-stage fit",
-      status: lateStageOrPostMarketing ? "aligned" : "needs_justification",
-      finding: lateStageOrPostMarketing
-        ? "The selected development stage fits late-stage or post-marketing practice-informing use."
-        : "Practice-informing PED-style discipline usually fits Phase 3/4 or post-marketing concepts, not early exploratory development.",
-      action: lateStageOrPostMarketing
-        ? "Continue with late-stage practice-informing assumptions."
-        : "Confirm the development stage or switch to a lighter guardrail profile if this is not late-stage/post-marketing.",
-    })
-    checks.push({
-      id: "phase3-safety",
-      label: "Template applicability",
-      status:
-        study.phase3SafetyDataAvailable === "yes"
-          ? "aligned"
-          : study.phase3SafetyDataAvailable === "no"
-            ? "consider_simplifying"
-            : "needs_justification",
+      id: "evidence-role",
+      label: "PED applicability",
+      status: evidenceRole ? "aligned" : "needs_justification",
       finding:
-        study.phase3SafetyDataAvailable === "yes"
-          ? "Phase 3 safety-data availability is confirmed for practice-informing PED-style discipline."
-          : study.phase3SafetyDataAvailable === "no"
-            ? "The PED template should not be treated as directly applicable if Phase 3 safety data are not available."
-            : "Phase 3 safety-data availability is not confirmed yet.",
+        applicability === "applies"
+          ? "The study is confirmed as non-label-enabling and PED streamlining recommendations apply directly."
+          : externalRequirements
+            ? `Study evidence role: ${evidenceRoleLabel}. Design coherence is assessed independently, and any entered external requirements are shown as a separate evidence layer.`
+            : "The study submission or evidence role is not confirmed. The assessment is descriptive and does not apply PED numerical limits.",
       action:
-        study.phase3SafetyDataAvailable === "yes"
-          ? "Continue using the practice-informing guardrail profile."
-          : "Confirm safety-data availability, or keep the profile as directional lean-design guidance only.",
+        applicability === "applies"
+          ? "Apply Retain, Simplify, Remove, and Clarify / align recommendations directly."
+          : externalRequirements
+            ? "Document the requirement source, owner, linked objective or endpoint, and decision consequence for material design elements."
+            : "Confirm the study evidence role and document decision, safety, regulatory, HTA, or other requirements before changing complex study elements.",
     })
+    if (evidenceRole === "non_label_enabling") {
+      checks.push({
+        id: "stage-fit",
+        label: "Development-stage fit",
+        status: phaseTwoToFour ? "aligned" : "needs_justification",
+        finding: phaseTwoToFour
+          ? "The study is Phase 2, 3, or 4, which fits the selected non-label-enabling PED application."
+          : "Direct PED application is limited here because the study is not identified as Phase 2, 3, or 4.",
+        action: phaseTwoToFour
+          ? "Continue with direct PED streamlining recommendations."
+          : "Confirm the development stage; until then, use the findings as a non-prescriptive complexity review.",
+      })
+    }
   }
 
   checks.push({
     id: "objectives",
-    label: "Objective count",
-    status: objectiveCount === 0 ? "needs_justification" : objectiveCount <= 5 ? "aligned" : "consider_simplifying",
+    label: directPed ? "Objective count" : "Objective traceability",
+    status:
+      objectiveCount === 0
+        ? "needs_justification"
+        : !directPed || objectiveCount <= objectiveTarget
+          ? "aligned"
+          : "consider_simplifying",
     finding:
       objectiveCount === 0
         ? "No research objective package is entered yet."
-        : `${objectiveCount} objective${objectiveCount === 1 ? "" : "s"} currently captured.`,
+        : directPed
+          ? `${objectiveCount} atomic objective${objectiveCount === 1 ? "" : "s"} currently captured; focused target is ${objectiveTarget}.`
+          : externalRequirements
+            ? `${objectiveCount} atomic objective${objectiveCount === 1 ? "" : "s"} currently captured. The count is descriptive; traceability and incremental value determine the assessment.`
+            : `${objectiveCount} atomic objective${objectiveCount === 1 ? "" : "s"} currently captured. No PED numerical target has been applied.`,
     action:
       objectiveCount === 0
         ? "Draft the primary objective before running downstream steps."
-        : objectiveCount <= 5
+        : !directPed
+          ? externalRequirements
+            ? "Trace every objective to a documented regulatory, HTA, safety, claim, or decision requirement and identify overlap without presuming removal."
+            : "Confirm a distinct purpose, owner, and endpoint link for every objective."
+          : objectiveCount <= objectiveTarget
           ? "Keep the objective package focused."
-          : "Trim secondary objectives or document why each additional objective is decision-critical.",
+          : "Trim compound or lower-priority secondary objectives until every remaining scientific question materially supports the selected decision.",
   })
 
   checks.push({
     id: "endpoints",
-    label: "Endpoint focus",
-    status: endpointCount === 0 ? "needs_justification" : endpointCount <= maxEndpointTarget ? "aligned" : "consider_simplifying",
+    label: directPed ? "Endpoint focus" : "Endpoint traceability",
+    status:
+      endpointCount === 0
+        ? "needs_justification"
+        : endpointMultiplicityNeedsReview
+          ? "needs_justification"
+          : !directPed || endpointCount <= endpointTarget
+          ? "aligned"
+          : "consider_simplifying",
     finding:
       endpointCount === 0
         ? "No endpoint package is entered yet."
-        : `${endpointCount} endpoint or assessment item${endpointCount === 1 ? "" : "s"} captured; target is about ${maxEndpointTarget} for the current objective count.`,
+        : endpointMultiplicityNeedsReview
+          ? `${keySecondaryEndpointCount} key secondary endpoints are identified without a visible multiplicity, hierarchy, gatekeeping, or alpha-allocation strategy. This is a statistical claim-architecture signal.`
+        : directPed
+          ? `${endpointCount} atomic endpoint or assessment item${endpointCount === 1 ? "" : "s"} captured; focused package target is about ${endpointTarget} and does not increase when more objectives are added.`
+          : externalRequirements
+            ? `${endpointCount} atomic endpoint or assessment item${endpointCount === 1 ? "" : "s"} captured. The count is descriptive; objective linkage, incremental value, dependency, and claim architecture determine the assessment.`
+            : `${endpointCount} atomic endpoint or assessment item${endpointCount === 1 ? "" : "s"} captured. No PED numerical target has been applied.`,
     action:
       endpointCount === 0
         ? "Add one primary endpoint and only the most important supporting endpoints."
-        : endpointCount <= maxEndpointTarget
+        : endpointMultiplicityNeedsReview
+          ? "Classify key secondary endpoints as inferential, descriptive, or externally requested; document testing hierarchy and error control before treating the package as claim-ready."
+        : !directPed
+          ? externalRequirements
+            ? "Trace each endpoint to its objective and documented external requirement; identify overlap, analysis timing, and decision consequence."
+            : "Confirm objective linkage, purpose, analysis timing, and decision consequence for each endpoint."
+          : endpointCount <= endpointTarget
           ? "Endpoint burden looks proportionate."
-          : "Ask AI for a lower-burden endpoint package, or justify endpoints that materially change interpretation.",
+          : "Prioritize one primary endpoint, essential safety, and only the supporting endpoints that materially change interpretation or the selected decision.",
+  })
+
+  checks.push({
+    id: "estimand",
+    label: "Endpoint and estimand link",
+    status: endpointCount === 0 || !estimand ? "needs_justification" : "aligned",
+    finding:
+      endpointCount === 0
+        ? "An endpoint package is needed before the clinical question can be expressed as an estimand."
+        : estimand
+          ? "An estimand is captured to define the treatment effect and analysis population for the endpoint package."
+          : "The endpoint package is present, but the estimand is not yet captured in PICO & Stats.",
+    action:
+      endpointCount === 0
+        ? "Define the primary endpoint first, then specify the estimand in PICO & Stats."
+        : estimand
+          ? "Confirm the estimand, endpoint timepoint, and intercurrent-event strategy remain consistent with the objectives and SoA."
+          : "Add the primary estimand in PICO & Stats before treating the design as decision-ready.",
   })
 
   checks.push({
     id: "duration",
     label: "Duration and timing",
-    status: hasTimeline ? "aligned" : "needs_justification",
-    finding: hasTimeline ? "Timeline or follow-up duration is captured." : "Study duration and follow-up timing are not yet explicit.",
+    status: !hasTimeline
+      ? "needs_justification"
+      : extendedOsNeedsSimplification && directPed
+        ? "consider_simplifying"
+        : extendedOsNeedsSimplification
+          ? "needs_justification"
+        : "aligned",
+    finding: !hasTimeline
+      ? "Study duration and follow-up timing are not yet explicit."
+      : extendedOsNeedsSimplification
+        ? "Extended OS follow-up is planned for a supportive endpoint without visible OS power or event assumptions."
+        : "Timeline or follow-up duration is captured.",
     action: hasTimeline
-      ? "Keep endpoint timing consistent with the timeline."
+      ? extendedOsNeedsSimplification && directPed
+        ? "Shorten, separate, or remove extended OS follow-up unless a retained OS objective, event target, and decision consequence justify the additional duration and cost."
+        : extendedOsNeedsSimplification
+          ? "Document the authority, claim, HTA, safety, or decision requirement for extended OS follow-up, with event assumptions, analysis timing, operational duration, and cost."
+        : "Keep endpoint timing consistent with the timeline."
       : "Add enrollment, treatment/observation, follow-up, or evidence-window timing.",
   })
+
+  if ((study.geography || "").trim()) {
+    checks.push({
+      id: "geography-footprint",
+      label: "Geography and operating footprint",
+      status:
+        geographyAssessment.footprintRecommendation === "simplify"
+          ? "consider_simplifying"
+          : geographyAssessment.footprintRecommendation === "align"
+            ? "needs_justification"
+            : "aligned",
+      finding: geographyAssessment.footprintRationale,
+      action:
+        geographyAssessment.footprintRecommendation === "retain"
+          ? "Confirm each country and site remains recruitment-productive or decision-relevant."
+          : directPed
+            ? "Remove low-yield, late-starting, operationally disproportionate, or access-irrelevant countries and sites before finalizing the footprint."
+            : "Document the country-level requirement and address low-yield, late-starting, high-obligation, or operationally disproportionate markets in the feasibility and governance plan.",
+    })
+  }
+
+  if (geographyAssessment.postTrialAccessAssessmentNeeded) {
+    checks.push({
+      id: "post-trial-access",
+      label: "Post-trial access and continued treatment",
+      status:
+        geographyAssessment.postTrialAccessRecommendation === "retain"
+          ? "aligned"
+          : "needs_justification",
+      finding: geographyAssessment.postTrialAccessRationale,
+      action:
+        geographyAssessment.postTrialAccessRecommendation === "retain"
+          ? "Keep the country-level access assumptions current through protocol finalization and budget approval."
+          : directPed
+            ? "Complete a country-by-country post-trial access and continued-treatment assessment, including duration, supply, monitoring, contracting, and budget. Then remove countries whose obligations are disproportionate to their recruitment, representativeness, or decision value."
+            : "Complete a country-by-country post-trial access and continued-treatment assessment, including authority source, duration, supply, monitoring, contracting, budget, recruitment contribution, and governance owner.",
+    })
+  }
 
   checks.push({
     id: "comparator",
@@ -5140,13 +7338,23 @@ function buildProtocolGuardrailAssessment(study: StudyForm): ProtocolGuardrailAs
   checks.push({
     id: "exploratory",
     label: "Exploratory burden",
-    status: hasExploratoryLanguage ? "needs_justification" : "aligned",
-    finding: hasExploratoryLanguage
-      ? "Exploratory, biomarker, subgroup, or mechanistic language appears in the endpoint package."
-      : "No obvious exploratory endpoint burden detected.",
-    action: hasExploratoryLanguage
-      ? "Keep only exploratory items that are decision-critical and label them clearly as non-claim-supporting."
-      : "Avoid adding exploratory readouts unless they clearly support the study decision.",
+    status:
+      exploratoryAlignmentStatus === "aligned"
+        ? "aligned"
+        : exploratoryRecommendedAction === "remove"
+          ? "consider_simplifying"
+          : "needs_justification",
+    alignmentStatus: exploratoryAlignmentStatus,
+    recommendedAction: exploratoryRecommendedAction,
+    finding: !hasExploratoryLanguage
+      ? "No obvious exploratory endpoint burden detected."
+      : exploratoryAlignmentStatus === "aligned"
+        ? "Biomarker or subgroup language appears prespecified and connected to a selected patient-selection, dose/regimen, or next-development decision."
+        : exploratoryCanSupportDecision
+          ? "Exploratory, biomarker, subgroup, or mechanistic language may support a selected decision, but the objective, analysis, threshold, or decision consequence is incomplete."
+          : "Exploratory, biomarker, subgroup, or mechanistic language appears in the endpoint package without a selected decision that it can materially change.",
+    action: exploratoryPreferredAction,
+    exceptionPath: exploratoryExceptionPath,
   })
 
   checks.push({
@@ -5166,7 +7374,9 @@ function buildProtocolGuardrailAssessment(study: StudyForm): ProtocolGuardrailAs
       ? "Add PRO/COA only if symptoms, functioning, treatment burden, QoL, tolerability, HTA, or practice interpretation need direct support."
       : specialAssessmentSignals.proJustified
         ? "Keep the PRO/COA set short and define the exact instrument/timepoint later in the synopsis or protocol."
-        : "Either connect PRO/COA to an objective or endpoint, or remove it to avoid low-value data collection.",
+        : directPed
+          ? "Either connect PRO/COA to an objective or endpoint, or remove it to avoid low-value data collection."
+          : "Document the required claim, HTA, safety, or decision role and connect PRO/COA to an objective, endpoint, instrument, and timepoint.",
   })
 
   checks.push({
@@ -5176,7 +7386,9 @@ function buildProtocolGuardrailAssessment(study: StudyForm): ProtocolGuardrailAs
       ? "aligned"
       : specialAssessmentSignals.pkPdJustified
         ? "aligned"
-        : "consider_simplifying",
+        : directPed
+          ? "consider_simplifying"
+          : "needs_justification",
     finding: !specialAssessmentSignals.hasPkPd
       ? "No PK/PD or exposure-response collection is currently visible."
       : specialAssessmentSignals.pkPdJustified
@@ -5186,7 +7398,9 @@ function buildProtocolGuardrailAssessment(study: StudyForm): ProtocolGuardrailAs
       ? "Do not add PK/PD by default for practice-informing or pragmatic studies."
       : specialAssessmentSignals.pkPdJustified
         ? "Keep PK/PD sampling sparse and aligned to the specific dose, safety, or bridging question."
-        : "Remove PK/PD collection or document why it is essential for the decision the study should support.",
+        : directPed
+          ? "Remove PK/PD collection or document why it is essential for the decision the study should support."
+          : "Document the regulatory, safety, bridging, special-population, dose, or other requirement and link it to a specific objective, analysis, and decision consequence.",
   })
 
   checks.push({
@@ -5205,8 +7419,10 @@ function buildProtocolGuardrailAssessment(study: StudyForm): ProtocolGuardrailAs
     action: !specialAssessmentSignals.hasBiomarker
       ? "Add biomarkers only if they define eligibility, stratification, endpoint interpretation, safety risk, or a prespecified decision."
       : specialAssessmentSignals.biomarkerJustified
-        ? "Keep biomarker collection limited to the prespecified decision or stratification need."
-        : "Clarify the biomarker decision role or remove the collection to reduce burden.",
+        ? "Keep biomarker collection limited to the prespecified decision or stratification need. Confirm the linked objective, endpoint or analysis, and collection timepoint remain explicit."
+        : directPed
+          ? "First link the biomarker to Patient selection, Next-development, Dose or regimen, safety, or another stated decision in Decision framing. Then define its secondary objective and linked endpoint, analysis, and timepoint. Retain the Schedule of Activities collection only after those links are explicit; otherwise remove it."
+          : "Document the biomarker's regulatory, HTA, safety, claim, or decision requirement and link it to an objective, endpoint or analysis, collection timepoint, and consequence.",
   })
 
   checks.push({
@@ -5226,33 +7442,170 @@ function buildProtocolGuardrailAssessment(study: StudyForm): ProtocolGuardrailAs
       ? "Avoid adding imaging, ECG, lab panels, wearables, or remote checks unless they support endpoints, safety, or feasibility."
       : specialAssessmentSignals.intensiveAssessmentsJustified
         ? "Keep timing lean and avoid duplicative assessments across visits."
-        : "Remove or consolidate special assessments before generating the SoA.",
+        : directPed
+          ? "Remove or consolidate special assessments before generating the SoA."
+          : "Document the endpoint, safety, authority, or feasibility requirement and review cadence, duplication, participant burden, and operating cost.",
   })
 
   checks.push({
     id: "eligibility",
-    label: "Eligibility burden",
-    status: eligibilityCount <= 12 ? "aligned" : eligibilityCount <= 18 ? "needs_justification" : "consider_simplifying",
+    label: directPed ? "Eligibility burden" : "Eligibility traceability",
+    status: directPed
+      ? eligibilityCount <= 12
+        ? "aligned"
+        : eligibilityCount <= 18
+          ? "needs_justification"
+          : "consider_simplifying"
+      : eligibilityCount === 0
+        ? "needs_justification"
+        : "aligned",
     finding:
       eligibilityCount === 0
         ? "Eligibility criteria are not yet structured."
-        : `${eligibilityCount} eligibility item${eligibilityCount === 1 ? "" : "s"} captured.`,
+        : `${eligibilityCount} eligibility item${eligibilityCount === 1 ? "" : "s"} captured.${
+            directPed
+              ? ""
+              : externalRequirements
+                ? " The count is descriptive; requirement traceability, recruitment effect, safety, and interpretability determine the assessment."
+                : " No PED numerical threshold has been applied."
+          }`,
     action:
-      eligibilityCount <= 12
+      !directPed
+        ? "Trace criteria to population definition, safety, interpretability, authority requirements, or operational feasibility; identify duplication and recruitment impact."
+        : eligibilityCount <= 12
         ? "Keep criteria inclusive, verifiable, and directly tied to safety or interpretability."
         : "Review whether restrictive criteria are necessary, non-duplicative, and verifiable during screening.",
   })
 
+  checks.forEach((check) => {
+    check.destinations = getProtocolGuardrailDestinations(check.id)
+  })
+
+  const stageDefinitions = [
+    {
+      id: "decision",
+      sequence: 1,
+      label: "Define the decision",
+      description: "Start with the clinical-practice, patient-selection, access, regulatory, development, or safety decision the study must enable.",
+      checkIds: ["decision-intent", "evidence-role", "stage-fit"],
+    },
+    {
+      id: "evidence-chain",
+      sequence: 2,
+      label: "Build the evidence chain",
+      description: "Keep objectives focused, then link each required endpoint and estimand to the decision it supports.",
+      checkIds: [
+        "objectives",
+        "endpoints",
+        "estimand",
+        "primary-decision-fit",
+        ...secondaryDecisions.map((decision) => `secondary-decision-${decision}`),
+        "exploratory",
+      ],
+    },
+    {
+      id: "interpretability",
+      sequence: 3,
+      label: "Protect interpretability",
+      description:
+        applicability !== "applies"
+          ? "Confirm which design safeguards are required for a credible, applicable, and externally acceptable result."
+          : "Retain only design safeguards that are necessary for a credible and applicable result.",
+      checkIds: ["comparator", "eligibility"],
+    },
+    {
+      id: "data-collection",
+      sequence: 4,
+      label: "Retain decision-critical data",
+      description:
+        applicability !== "applies"
+          ? "Confirm whether special data collection is required by the decision, safety, regulatory, HTA, or another external expectation."
+          : "Special data collection must earn its place through a clear objective, endpoint, safety, or feasibility need.",
+      checkIds: ["pro-coa", "pk-pd", "biomarkers", "special-assessments"],
+    },
+    {
+      id: "burden-timeline",
+      sequence: 5,
+      label: "Reconcile burden and timing",
+      description:
+        applicability !== "applies"
+          ? "Review whether cadence, follow-up, country footprint, and site burden are proportionate after external requirements are confirmed."
+          : "Use the leanest cadence, follow-up, country footprint, and site network that still protect the decision, safety, endpoint interpretation, and participant obligations.",
+      checkIds: ["duration", "geography-footprint", "post-trial-access"],
+    },
+  ]
+
+  const stages: ProtocolGuardrailStage[] = stageDefinitions.map((stage) => ({
+    ...stage,
+    status: getProtocolGuardrailStageStatus(checks, stage.checkIds),
+  }))
+
+  const priorityActions = checks
+    .filter((check) => check.status !== "aligned")
+    .map((check) => ({ lane: getProtocolGuardrailPriorityLane(check), check }))
+    .sort((left, right) => {
+      const laneOrder = { resolve: 0, justify: 1, simplify: 2 }
+      return laneOrder[left.lane] - laneOrder[right.lane]
+    })
+  const reconciliationGroups = buildProtocolGuardrailReconciliationGroups(
+    study,
+    stats,
+    schedule,
+    checks,
+    profile,
+    impactAssessment,
+  )
+
   return {
     profile,
-    label: PROTOCOL_GUARDRAIL_LABELS[profile],
+    label:
+      applicability === "external_requirements"
+        ? "External requirements reconciliation"
+        : applicability === "general_complexity"
+          ? "General design complexity review"
+          : PROTOCOL_GUARDRAIL_LABELS[profile],
     summary:
       profile === "none"
         ? "No additional protocol-template discipline is active."
-        : profile === "practice_informing_ped"
-          ? "Late-stage practice-informing discipline is active: focused objectives, lean endpoints, explicit duration, simple design, and minimized data collection."
-          : "Lean decision-evidence discipline is active: keep only evidence elements that materially support the stated downstream decision.",
+        : applicability === "applies"
+          ? "PED streamlining applies directly: focused objectives, lean endpoints, explicit duration, simple design, and minimized data collection."
+          : applicability === "external_requirements"
+            ? (study.externalRequirements || "").trim()
+              ? "Design contribution and external-requirement evidence are assessed separately. Recommendations focus on alignment, incremental value, overlap, claim architecture, and burden."
+              : "No external requirements have been entered. The report still evaluates alignment, incremental value, dependency, overlap, multiplicity, timing, cost, and operational burden."
+            : "Review purpose, traceability, overlap, and burden descriptively while the study role is unconfirmed. No PED numerical limits are applied.",
+    applicability,
+    applicabilityLabel: getProtocolGuardrailApplicabilityLabel(applicability),
+    evidenceRoleLabel,
+    primaryDecisionLabel: getPrimaryDecisionLabel(study),
+    secondaryDecisionLabels: getSecondaryDecisionLabels(study),
+    dissemination: getPlannedEvidenceOutputs(study),
+    trace: [
+      {
+        label: "Primary decision enabled",
+        value: decisionIntent || "Define the decision this study must enable",
+        complete: hasDecisionIntent,
+      },
+      {
+        label: "Primary objective",
+        value: primaryObjective || "Add a focused primary objective",
+        complete: Boolean(primaryObjective),
+      },
+      {
+        label: "Primary endpoint",
+        value: endpointItems[0]?.text || "Add a primary endpoint",
+        complete: Boolean(endpointItems[0]),
+      },
+      {
+        label: "Estimand",
+        value: estimand || "Add in PICO & Stats",
+        complete: Boolean(estimand),
+      },
+    ],
+    stages,
+    priorityActions,
     checks,
+    reconciliationGroups,
   }
 }
 
@@ -5340,8 +7693,11 @@ function buildStudySchemaFingerprint(study: StudyForm) {
     study.category,
     study.subcategory,
     study.developmentStage,
+    study.primaryDecisionEnabled,
+    study.decisionStatement,
+    study.secondaryDecisionsEnabled.join(","),
     getResolvedProtocolGuardrailProfile(study),
-    study.phase3SafetyDataAvailable,
+    getResolvedStudyEvidenceRole(study),
     getStrategicObjectiveLabel(study),
     getPrimaryEvidenceUseIntent(study),
     study.therapeuticArea,
@@ -7013,6 +9369,10 @@ function buildPicoFromStudy(study: StudyForm): PicoForm {
     `Study title: ${normalizedStudy.studyTitle || "Untitled study"}`,
     `Development stage: ${normalizedStudy.developmentStage || "Not selected"}`,
     buildProtocolGuardrailInstruction(normalizedStudy),
+    `Primary decision enabled: ${getPrimaryDecisionLabel(normalizedStudy) || "Not selected"}`,
+    `Decision interpretation: ${getDecisionStatement(normalizedStudy) || "Not available"}`,
+    `Secondary decisions enabled: ${getSecondaryDecisionLabels(normalizedStudy).join(", ") || "None selected"}`,
+    `Planned evidence outputs: ${getPlannedEvidenceOutputs(normalizedStudy).join(", ") || "Scientific publication assumed; no additional outputs selected"}`,
     `Strategic objective: ${getStrategicObjectiveLabel(normalizedStudy) || "Not selected"}`,
     `Primary evidence use intent: ${evidenceIntent || "Not selected"}`,
     `Secondary evidence use intents: ${normalizedStudy.secondaryEvidenceUseIntents.join(", ") || "None selected"}`,
@@ -7742,6 +10102,542 @@ function buildScheduleInsightsFromState(
   })
 }
 
+function findScheduleRows(schedule: ScheduleForm, patterns: RegExp[]) {
+  return schedule.rows
+    .filter((row) => patterns.some((pattern) => pattern.test(`${row.group} ${row.activity} ${row.notes}`)))
+    .map((row) => row.activity)
+    .filter(Boolean)
+}
+
+function buildEvidenceBadgeMap(schedule: ScheduleForm, navigator: EvidenceNavigator) {
+  const map: Record<string, string[]> = {}
+
+  if (!navigator.items.length) {
+    return map
+  }
+
+  schedule.rows.forEach((row) => {
+    const rowLabel = row.activity.trim().toLowerCase()
+    const badges = navigator.items
+      .filter((item) => item.soaRows.some((soaRow) => soaRow.trim().toLowerCase() === rowLabel))
+      .map((item) => {
+        if (item.requiredFor === "heor") return "HEOR"
+        return `${item.requiredFor.charAt(0).toUpperCase()}${item.requiredFor.slice(1)}`
+      })
+
+    if (badges.length) {
+      map[row.id] = Array.from(new Set(badges))
+    }
+  })
+
+  return map
+}
+
+function getDefaultCostProfile(dataDomain: string): {
+  costImplication: CostImplication
+  dataCollectionCost: CostImplication
+  followUpDurationImpact: AnalysisImpact
+  followUpDurationRationale: string
+  costDrivers: string[]
+  costRationale: string
+  costValueJudgment: CostValueJudgment
+} {
+  const normalized = dataDomain.toLowerCase()
+
+  if (/overall survival|\bos\b|survival|mortality|death|subsequent anticancer|long[- ]term follow[- ]up/.test(normalized)) {
+    return {
+      costImplication: "depends",
+      dataCollectionCost: "low",
+      followUpDurationImpact: "high",
+      followUpDurationRationale:
+        "Survival-status capture is usually simple, but event maturity can extend retention, survival follow-up, subsequent-treatment capture, monitoring, and database-lock timing beyond the primary analysis.",
+      costDrivers: ["extended survival follow-up", "site retention and status ascertainment", "subsequent-treatment capture", "database-lock timing"],
+      costRationale:
+        "Overall survival should be planned as a timeline and operational cost, not only a low-cost data field. The incremental impact depends on whether follow-up continues beyond the primary endpoint readout.",
+      costValueJudgment: "worth_adding",
+    }
+  }
+
+  if (/biomarker|biospecimen|genomic|sample/.test(normalized)) {
+    return {
+      costImplication: "high",
+      dataCollectionCost: "high",
+      followUpDurationImpact: "low",
+      followUpDurationRationale: "Biospecimen collection does not usually extend study duration unless a long-term translational follow-up plan is added.",
+      costDrivers: ["sample kits", "central lab or assay vendor", "shipping and storage", "consent and data reconciliation"],
+      costRationale: "Biospecimen workflows usually add vendor, logistics, assay, and sample-management cost beyond routine visit activity.",
+      costValueJudgment: "only_if_strategic_priority",
+    }
+  }
+
+  if (/patient-reported|pro|quality|symptom/.test(normalized)) {
+    return {
+      costImplication: "medium",
+      dataCollectionCost: "medium",
+      followUpDurationImpact: "medium",
+      followUpDurationRationale: "Longitudinal PRO collection can extend participant-completion monitoring through treatment and follow-up, depending on the planned endpoint window.",
+      costDrivers: ["instrument licensing", "ePRO setup", "translations", "site and participant compliance follow-up"],
+      costRationale: "PRO collection is not usually procedure-heavy, but licensing, ePRO setup, translations, and completion monitoring can be material.",
+      costValueJudgment: "worth_adding",
+    }
+  }
+
+  if (/resource|utilization|hospital|cost/.test(normalized)) {
+    return {
+      costImplication: "medium",
+      dataCollectionCost: "medium",
+      followUpDurationImpact: "medium",
+      followUpDurationRationale: "Resource-use capture can require continued follow-up beyond treatment to reflect downstream healthcare use.",
+      costDrivers: ["additional CRF fields", "coding and data cleaning", "follow-up queries", "HEOR review"],
+      costRationale: "Resource-use capture is mostly data-management and review effort rather than procedure cost.",
+      costValueJudgment: "worth_adding",
+    }
+  }
+
+  if (/frailty|geriatric|comorbid|polypharmacy|special-population/.test(normalized)) {
+    return {
+      costImplication: "low",
+      dataCollectionCost: "low",
+      followUpDurationImpact: "low",
+      followUpDurationRationale: "These baseline assessments generally do not extend the follow-up period.",
+      costDrivers: ["site time", "training and scoring", "baseline data cleaning"],
+      costRationale: "Most frailty or comorbidity variables can be captured through structured baseline assessment with limited vendor dependence.",
+      costValueJudgment: "worth_adding",
+    }
+  }
+
+  if (/primary|endpoint|tumor|imaging|assessment/.test(normalized)) {
+    return {
+      costImplication: "depends",
+      dataCollectionCost: "depends",
+      followUpDurationImpact: "medium",
+      followUpDurationRationale: "Timeline impact depends on endpoint maturity, visit cadence, confirmation rules, and whether follow-up continues beyond treatment.",
+      costDrivers: ["assessment frequency", "central review", "imaging or endpoint adjudication", "data cleaning"],
+      costRationale: "Endpoint assessment cost depends on whether it requires central reading, special procedures, or only routine data capture.",
+      costValueJudgment: "worth_adding",
+    }
+  }
+
+  return {
+    costImplication: "low",
+    dataCollectionCost: "low",
+    followUpDurationImpact: "low",
+    followUpDurationRationale: "No material extension to study follow-up is apparent from this data domain alone.",
+    costDrivers: ["CRF fields", "site time", "data cleaning"],
+    costRationale: "This appears primarily to add structured data capture and review effort.",
+    costValueJudgment: "only_if_strategic_priority",
+  }
+}
+
+function getDefaultEvidenceOutcomeProfile(
+  dataDomain: string,
+  requiredFor: EvidenceRequiredFor,
+): Pick<
+  EvidenceMapItem,
+  "clinicalRelevance" | "clinicalRelevanceRationale" | "supportiveEvidenceMessage" | "inconclusiveEvidenceRisk"
+> {
+  const normalized = dataDomain.toLowerCase()
+
+  if (/biomarker|biospecimen|genomic|sample/.test(normalized)) {
+    return {
+      clinicalRelevance: "hypothesis_generating",
+      clinicalRelevanceRationale: "A biomarker-response association can identify a population for prospective validation, but does not establish patient selection on its own.",
+      supportiveEvidenceMessage: "Generates a biologically plausible predictive hypothesis for a defined population and a future validation study.",
+      inconclusiveEvidenceRisk: "No predictive claim can be made; any observed association remains exploratory and may have limited standalone clinical impact.",
+    }
+  }
+
+  if (/patient-reported|pro|quality|symptom/.test(normalized)) {
+    return {
+      clinicalRelevance: "direct",
+      clinicalRelevanceRationale: "Patient-reported outcomes show whether treatment effect is accompanied by a meaningful patient-perceived benefit or burden.",
+      supportiveEvidenceMessage: "Supports a patient-centred benefit narrative alongside clinical efficacy and safety findings.",
+      inconclusiveEvidenceRisk: "Patient benefit is uncertain; the clinical narrative must rely more heavily on clinician-reported or disease-control outcomes.",
+    }
+  }
+
+  if (/safety|tolerability|adverse|laboratory|ecg|vital/.test(normalized)) {
+    return {
+      clinicalRelevance: "direct",
+      clinicalRelevanceRationale: "Safety and tolerability data directly inform benefit-risk interpretation, monitoring needs, and patient counselling.",
+      supportiveEvidenceMessage: "Supports a clinically interpretable benefit-risk and tolerability narrative, including management of key adverse events.",
+      inconclusiveEvidenceRisk: "The safety profile or its clinical manageability remains uncertain, weakening practical treatment-use conclusions.",
+    }
+  }
+
+  if (/frailty|geriatric|comorbid|polypharmacy|special-population/.test(normalized)) {
+    return {
+      clinicalRelevance: "contextual",
+      clinicalRelevanceRationale: "Characterises whether findings apply to patients whose baseline vulnerability may influence tolerability and treatment decisions.",
+      supportiveEvidenceMessage: "Strengthens clinical applicability and treatment-tolerance interpretation in the relevant patient subgroup.",
+      inconclusiveEvidenceRisk: "Applicability to the special population remains uncertain and may be reduced to crude age- or ECOG-based comparisons.",
+    }
+  }
+
+  if (/resource|utilization|hospital|cost/.test(normalized)) {
+    return {
+      clinicalRelevance: "contextual",
+      clinicalRelevanceRationale: "Resource-use data contextualise the practical burden of treatment, although they do not independently establish clinical benefit.",
+      supportiveEvidenceMessage: "Supports a practical-care narrative showing whether treatment burden and healthcare use are acceptable in context.",
+      inconclusiveEvidenceRisk: "The clinical and system burden remains difficult to interpret, limiting payer and practice-context discussions.",
+    }
+  }
+
+  if (requiredFor === "primary") {
+    return {
+      clinicalRelevance: "direct",
+      clinicalRelevanceRationale: "This domain supports the study's main efficacy question and the core benefit-risk decision.",
+      supportiveEvidenceMessage: "Supports the primary clinical benefit claim and the main efficacy publication narrative.",
+      inconclusiveEvidenceRisk: "The primary clinical benefit claim is not supported or remains uncertain; interpretation must shift to other prespecified evidence.",
+    }
+  }
+
+  return {
+    clinicalRelevance: requiredFor === "exploratory" ? "hypothesis_generating" : "contextual",
+    clinicalRelevanceRationale:
+      requiredFor === "exploratory"
+        ? "This domain can inform a future clinical hypothesis but requires confirmation before influencing care."
+        : "This domain strengthens the clinical interpretation of treatment benefit, risk, or applicability.",
+    supportiveEvidenceMessage:
+      requiredFor === "exploratory"
+        ? "Generates a clinically relevant hypothesis for confirmation in a future study."
+        : "Strengthens the clinical interpretation and evidence narrative for the planned study use.",
+    inconclusiveEvidenceRisk:
+      requiredFor === "exploratory"
+        ? "No confirmatory claim can be made; the result remains descriptive or hypothesis-generating."
+        : "The related clinical interpretation becomes weaker and may need to rely on indirect or descriptive evidence.",
+  }
+}
+
+function getDefaultEvidencePlanningProfile(
+  dataDomain: string,
+  requiredFor: EvidenceRequiredFor,
+): Pick<
+  EvidenceMapItem,
+  | "analysisReadiness"
+  | "decisionImportance"
+  | "decisionUse"
+  | "decisionAudience"
+  | "dataCaptureSource"
+  | "keyCollectionTimepoints"
+  | "minimumDataQuality"
+> {
+  const normalized = dataDomain.toLowerCase()
+
+  if (/biomarker|biospecimen|genomic|sample/.test(normalized)) {
+    return {
+      analysisReadiness: "hypothesis_generating",
+      decisionImportance: "low",
+      decisionUse: "Prioritise a future biomarker-validation question only when it has an explicit strategic decision use.",
+      decisionAudience: ["Clinical development", "Translational research"],
+      dataCaptureSource: "Central laboratory or qualified assay vendor with linked clinical data",
+      keyCollectionTimepoints: ["Baseline", "Prespecified on-treatment or progression timepoint"],
+      minimumDataQuality: "Prespecified assay, sample handling, chain of custody, and sufficient analyzable samples for the planned exploratory analysis.",
+    }
+  }
+
+  if (/patient-reported|pro|quality|symptom/.test(normalized)) {
+    return {
+      analysisReadiness: "supportive",
+      decisionImportance: "moderate",
+      decisionUse: "Determine whether clinical activity is accompanied by a patient-perceived benefit or treatment burden.",
+      decisionAudience: ["Clinicians", "Medical Affairs", "Patients"],
+      dataCaptureSource: "Validated ePRO or licensed patient-reported outcome instrument",
+      keyCollectionTimepoints: ["Baseline", "Prespecified on-treatment visits", "End of treatment", "Follow-up when relevant"],
+      minimumDataQuality: "Prespecified instrument and scoring, appropriate translations, and completion rates sufficient for the planned longitudinal analysis.",
+    }
+  }
+
+  if (/safety|tolerability|adverse|laboratory|ecg|vital/.test(normalized)) {
+    return {
+      analysisReadiness: "decision_ready",
+      decisionImportance: "high",
+      decisionUse: "Characterise benefit-risk, monitoring needs, and practical management of treatment-related harms.",
+      decisionAudience: ["Clinicians", "Clinical development", "Medical Affairs"],
+      dataCaptureSource: "Site assessment and EDC, with local or central laboratory and adjudication data where applicable",
+      keyCollectionTimepoints: ["Baseline", "Each treatment visit", "End of treatment", "Safety follow-up"],
+      minimumDataQuality: "Standardised AE grading, complete treatment exposure and dose-modification data, and timely follow-up of clinically important events.",
+    }
+  }
+
+  if (/frailty|geriatric|comorbid|polypharmacy|special-population/.test(normalized)) {
+    return {
+      analysisReadiness: "supportive",
+      decisionImportance: "moderate",
+      decisionUse: "Assess applicability and tolerability in a clinically important, vulnerable, or underrepresented population.",
+      decisionAudience: ["Clinicians", "Medical Affairs", "Guideline stakeholders"],
+      dataCaptureSource: "Structured baseline assessment in EDC and source medical record",
+      keyCollectionTimepoints: ["Baseline"],
+      minimumDataQuality: "Prespecified frailty or comorbidity measure, consistent scoring, and adequate representation of the target population.",
+    }
+  }
+
+  if (/resource|utilization|hospital|cost/.test(normalized)) {
+    return {
+      analysisReadiness: "supportive",
+      decisionImportance: "moderate",
+      decisionUse: "Contextualise practical treatment burden and provide inputs for payer, HTA, or service-use discussions.",
+      decisionAudience: ["HEOR", "Payers and HTA", "Medical Affairs"],
+      dataCaptureSource: "EDC resource-use fields, site records, and healthcare utilisation abstraction where feasible",
+      keyCollectionTimepoints: ["Baseline period when relevant", "Each treatment period", "End of treatment", "Follow-up"],
+      minimumDataQuality: "Defined resource-use categories, consistent recall period, and source verification sufficient for the intended economic analysis.",
+    }
+  }
+
+  if (requiredFor === "primary") {
+    return {
+      analysisReadiness: "decision_ready",
+      decisionImportance: "high",
+      decisionUse: "Answer the principal clinical decision and support the primary study conclusion.",
+      decisionAudience: ["Clinicians", "Clinical development", "Medical Affairs"],
+      dataCaptureSource: "Protocol-specified clinical assessment and EDC, with central review where required",
+      keyCollectionTimepoints: ["Baseline", "All prespecified endpoint assessment visits", "End of treatment or follow-up as required"],
+      minimumDataQuality: "Prespecified endpoint definition, assessment schedule, confirmation rules, and data completeness adequate for the estimand.",
+    }
+  }
+
+  return {
+    analysisReadiness: requiredFor === "exploratory" ? "hypothesis_generating" : "supportive",
+    decisionImportance: requiredFor === "exploratory" ? "low" : "moderate",
+    decisionUse:
+      requiredFor === "exploratory"
+        ? "Explore a future question only when it can influence a defined next research or evidence decision."
+        : "Strengthen interpretation of the study's planned clinical and evidence-use conclusions.",
+    decisionAudience:
+      requiredFor === "heor" ? ["HEOR", "Payers and HTA"] : requiredFor === "publication" ? ["Medical Affairs", "Publication planning"] : ["Medical Affairs", "Clinical development"],
+    dataCaptureSource: "Protocol-specified EDC fields and supporting source documentation",
+    keyCollectionTimepoints: ["Baseline and prespecified protocol timepoints"],
+    minimumDataQuality: "A prespecified variable definition, collection schedule, and completeness sufficient for the intended analysis.",
+  }
+}
+
+function buildEvidenceNavigatorFromState(
+  study: StudyForm,
+  pico: PicoForm,
+  stats: StatsForm,
+  schedule: ScheduleForm,
+): EvidenceNavigator {
+  const studyText = [
+    study.primaryObjective,
+    study.secondaryObjectives,
+    study.outcomes,
+    study.population,
+    study.operationalNotes,
+    pico.outcomes,
+    stats.estimand,
+  ]
+    .join(" ")
+    .toLowerCase()
+  const evidenceIntentText = [
+    study.primaryDecisionEnabled,
+    getPrimaryDecisionLabel(study),
+    getDecisionStatement(study),
+    ...getSecondaryDecisionLabels(study),
+    study.primaryEvidenceUseIntent,
+    ...(study.secondaryEvidenceUseIntents || []),
+  ]
+    .join(" ")
+    .toLowerCase()
+  const hasRows = (patterns: RegExp[]) => findScheduleRows(schedule, patterns).length > 0
+  const getObjectiveLink = (requiredFor: EvidenceRequiredFor) => {
+    if (requiredFor === "primary") return study.primaryObjective || "Evaluate the primary study outcome."
+    if (requiredFor === "secondary") return study.secondaryObjectives || "Characterize prespecified secondary outcomes."
+    if (requiredFor === "safety") return "Characterize treatment safety and tolerability."
+    if (requiredFor === "heor") return "Characterize healthcare use and the practical burden of treatment."
+    if (requiredFor === "publication") return "Generate evidence for the intended publication and evidence-use strategy."
+    return study.secondaryObjectives || "Explore clinically relevant hypotheses and subgroups."
+  }
+  const getEndpointLink = (requiredFor: EvidenceRequiredFor) => {
+    const coreEndpoint = stats.estimand || pico.outcomes || getResolvedOutcomes(study)
+    if (requiredFor === "primary") return coreEndpoint || "Primary endpoint package"
+    if (requiredFor === "secondary") return coreEndpoint || "Prespecified secondary endpoint package"
+    if (requiredFor === "safety") return "Incidence, severity, timing, management, and treatment impact of adverse events"
+    if (requiredFor === "heor") return "Hospitalization, emergency care, concomitant medication, and treatment-resource use"
+    if (requiredFor === "publication") return "Prespecified evidence output and supporting analyses"
+    return "Exploratory subgroup, association, or hypothesis-generating analysis"
+  }
+  const makeItem = (
+    id: string,
+    dataDomain: string,
+    patterns: RegExp[],
+    requiredFor: EvidenceRequiredFor,
+    collectionBurden: AnalysisImpact,
+    evidenceValue: AnalysisImpact,
+    analysesUnlocked: string[],
+    futureOpportunities: string[],
+    ifMissing: string,
+    recommendation: EvidenceRecommendation,
+    decisionImportanceOverride?: DecisionImportance,
+  ): EvidenceMapItem => {
+    const soaRows = findScheduleRows(schedule, patterns)
+    const planningProfile = getDefaultEvidencePlanningProfile(dataDomain, requiredFor)
+
+    return {
+      ...getDefaultCostProfile(dataDomain),
+      ...getDefaultEvidenceOutcomeProfile(dataDomain, requiredFor),
+      ...planningProfile,
+      analysisReadiness: soaRows.length ? planningProfile.analysisReadiness : "not_ready",
+      decisionImportance: decisionImportanceOverride || planningProfile.decisionImportance,
+      id,
+      dataDomain,
+      soaRows,
+      requiredFor,
+      objectiveLink: getObjectiveLink(requiredFor),
+      endpointOrEstimand: getEndpointLink(requiredFor),
+      collectionBurden,
+      evidenceValue,
+      analysesUnlocked,
+      futureOpportunities,
+      ifMissing,
+      recommendation,
+    }
+  }
+
+  const items: EvidenceMapItem[] = [
+    makeItem(
+      "endpoint-assessments",
+      "Primary endpoint assessments",
+      [/efficacy|response|imaging|tumou?r|disease assessment|outcome|progression/i],
+      "primary",
+      "medium",
+      "high",
+      ["Primary endpoint analysis", "Endpoint timing and censoring interpretation"],
+      ["Core study readout", "Primary manuscript"],
+      "Primary objective support becomes weak or impossible if endpoint-critical assessments are not scheduled.",
+      "keep",
+    ),
+    makeItem(
+      "safety-tolerability",
+      "Safety and tolerability data",
+      [/adverse event|safety|laboratory|hematology|chemistry|vital|physical exam|ecg|concomitant/i],
+      "safety",
+      "medium",
+      "high",
+      ["Treatment-emergent AE summaries", "Dose interruption or discontinuation context"],
+      ["Tolerability narrative", "Safety-focused publication or congress output"],
+      "Tolerability claims become limited to sparse safety capture and may not explain treatment changes.",
+      "keep",
+    ),
+  ]
+
+  if (/patient-reported|quality of life|symptom|epro|\bpro\b|\bcoa\b/.test(studyText) || hasRows([/patient-reported|questionnaire|quality of life|symptom|epro|\bpro\b/i])) {
+    items.push(
+      makeItem(
+        "patient-reported-outcomes",
+        "Patient-reported outcomes",
+        [/patient-reported|questionnaire|quality of life|symptom|pro/i],
+        "secondary",
+        "medium",
+        "high",
+        ["Quality-of-life analysis", "Symptom burden and treatment convenience analysis"],
+        ["Patient-centered value publication", "Guideline or practice discussion support"],
+        "Patient-centered value becomes anecdotal or dependent on clinician-reported proxies.",
+        hasRows([/patient-reported|questionnaire|quality of life|symptom|epro|\bpro\b/i]) ? "keep" : "add",
+        "high",
+      ),
+    )
+  }
+
+  if (/hta|payer|market access|resource|hospital|cost/.test(`${studyText} ${evidenceIntentText}`)) {
+    items.push(
+      makeItem(
+        "resource-use",
+        "Healthcare resource utilization",
+        [/resource|hospital|emergency|healthcare|medication|concomitant/i],
+        "heor",
+        "medium",
+        "high",
+        ["Hospitalization and ER-use analysis", "Cost or budget-impact inputs"],
+        ["HEOR analysis", "Payer or HTA evidence package"],
+        "HTA and payer relevance weakens because economic models must rely on assumptions or external data.",
+        hasRows([/resource|hospital|emergency|healthcare/i]) ? "keep" : "add",
+        "high",
+      ),
+    )
+  }
+
+  if (/elderly|frail|geriatric|comorbid|polypharmacy|real-world|real world/.test(studyText)) {
+    items.push(
+      makeItem(
+        "frailty-special-population",
+        "Frailty and special-population characterization",
+        [/ecog|performance status|frailty|geriatric|comorbid|medication|polypharmacy|baseline characteristic/i],
+        "exploratory",
+        "medium",
+        "high",
+        ["Outcomes by frailty or performance status", "Treatment tolerance by baseline vulnerability"],
+        ["Special-population evidence", "Practice-informing subgroup publication"],
+        "The study can still analyze by age, but the frailty story becomes crude and less clinically persuasive.",
+        hasRows([/ecog|performance status|frailty|geriatric|comorbid|polypharmacy/i]) ? "keep" : "add",
+        "high",
+      ),
+    )
+  }
+
+  if (/biomarker|mutation|genomic|predictive|subgroup/.test(studyText) || hasRows([/biomarker|biospecimen|genomic|mutation/i])) {
+    items.push(
+      makeItem(
+        "biomarkers",
+        "Biomarkers and biospecimens",
+        [/biomarker|biospecimen|genomic|mutation|sample/i],
+        "exploratory",
+        "high",
+        "medium",
+        ["Predictive subgroup hypothesis generation", "Biomarker-defined response exploration"],
+        ["Translational evidence output", "Future study hypothesis"],
+        "Predictive biomarker hypotheses become impossible or limited to external datasets.",
+        hasRows([/biomarker|biospecimen|genomic|mutation/i]) ? "optional" : "optional",
+        "moderate",
+      ),
+    )
+  }
+
+  const coverage: EvidenceCoverage[] = [
+    {
+      area: "Primary endpoint support",
+      status: items.some((item) => item.id === "endpoint-assessments" && item.soaRows.length) ? "strong" : "weak",
+      rationale: "Based on whether the SoA includes endpoint-critical efficacy or outcome assessments.",
+    },
+    {
+      area: "Safety and tolerability story",
+      status: items.some((item) => item.id === "safety-tolerability" && item.soaRows.length) ? "strong" : "partial",
+      rationale: "Based on AE, safety, laboratory, vitals, ECG, and concomitant-medication capture.",
+    },
+    {
+      area: "Future evidence opportunities",
+      status: items.filter((item) => item.requiredFor !== "primary" && item.soaRows.length).length >= 2 ? "strong" : "partial",
+      rationale: "Based on optional domains that can support subgroup, patient-centered, HEOR, translational, or publication outputs.",
+    },
+  ]
+
+  const gaps = items
+    .filter((item) => item.recommendation === "add" && !item.soaRows.length)
+    .map((item) => `${item.dataDomain}: ${item.ifMissing}`)
+
+  return normalizeEvidenceNavigator({
+    generatedAt: new Date().toISOString(),
+    provenance: "local_draft",
+    executiveSummary:
+      "This local evidence map links the current SoA to the analyses and evidence opportunities it can support. Treat it as directional and confirm priorities with clinical, statistics, HEOR, and publication stakeholders.",
+    coverage,
+    items,
+    gaps,
+    simulatorOptions: items
+      .filter((item) => item.requiredFor !== "primary")
+      .map((item) => ({
+        id: item.id,
+        label: item.dataDomain,
+        currentStatus: item.soaRows.length ? "included" : "missing",
+        collectionBurden: item.collectionBurden,
+        evidenceValue: item.evidenceValue,
+        analysesUnlocked: item.analysesUnlocked,
+        tradeoff: item.soaRows.length
+          ? `Keeping this domain preserves ${item.futureOpportunities.join(", ").toLowerCase() || "future evidence options"}.`
+          : item.ifMissing,
+      })),
+  })
+}
+
 function validateSchedule(schedule: ScheduleForm) {
   const missing = []
   const hasScheduledActivity = schedule.rows.some((row) =>
@@ -7921,6 +10817,8 @@ function renderScheduleTableHtml(schedule: ScheduleForm) {
   const phaseGroups = getPhaseGroups(schedule.columns)
   const periodGroups = getPeriodGroups(schedule.columns)
   const rowGroups = getScheduleRowGroups(schedule.rows)
+  const showNotesColumn = shouldShowScheduleNotes(schedule)
+  const fixedColumnCount = 2 + (showNotesColumn ? 1 : 0)
 
   return `
     <table class="soa-table">
@@ -7929,7 +10827,7 @@ function renderScheduleTableHtml(schedule: ScheduleForm) {
           <th rowspan="3">Section</th>
           <th rowspan="3">Activity</th>
           ${phaseGroups.map((group) => `<th colspan="${group.span}">${escapeHtml(group.label)}</th>`).join("")}
-          <th rowspan="3">Notes</th>
+          ${showNotesColumn ? `<th rowspan="3">Notes</th>` : ""}
         </tr>
         <tr>
           ${periodGroups.map((group) => `<th colspan="${group.span}">${escapeHtml(group.label)}</th>`).join("")}
@@ -7947,7 +10845,7 @@ function renderScheduleTableHtml(schedule: ScheduleForm) {
         ${rowGroups
           .map(
             (group) => `
-              <tr class="soa-group"><td colspan="${schedule.columns.length + 3}">${escapeHtml(group.group)}</td></tr>
+              <tr class="soa-group"><td colspan="${schedule.columns.length + fixedColumnCount}">${escapeHtml(group.group)}</td></tr>
               ${group.rows
                 .map(
                   (row) => `
@@ -7955,7 +10853,7 @@ function renderScheduleTableHtml(schedule: ScheduleForm) {
                       <td></td>
                       <td>${escapeHtml(row.activity)}</td>
                       ${schedule.columns.map((column) => `<td>${escapeHtml(row.cells[column.id] || "")}</td>`).join("")}
-                      <td>${escapeHtml(row.notes || "")}</td>
+                      ${showNotesColumn ? `<td>${escapeHtml(row.notes || "")}</td>` : ""}
                     </tr>
                   `,
                 )
@@ -8000,6 +10898,474 @@ function scheduleToHtml(schedule: ScheduleForm) {
         .join("")}
     </div>
   `
+}
+
+function listToHtml(items: string[]) {
+  return items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "<p>None specified.</p>"
+}
+
+function protocolGuardrailAssessmentToHtml(
+  assessment: ProtocolGuardrailAssessment,
+  impactAssessment: ImpactAssessment,
+  study: StudyForm,
+) {
+  const showExternalRequirementStatus = assessment.applicability === "external_requirements"
+  const reconciliationGroupsHtml = assessment.reconciliationGroups
+    .map(
+      (group) => `
+        <tr class="group-row">
+          <td colspan="${showExternalRequirementStatus ? 6 : 5}">
+            <strong>${escapeHtml(group.label)}</strong>
+            <span>${escapeHtml(group.description)}</span>
+          </td>
+        </tr>
+        ${group.items
+          .map((item) => {
+            const designAssessment = getProtocolGuardrailDesignAssessment(item)
+            const externalStatus = getExternalRequirementStatus(item, study, assessment.applicability)
+            return `
+              <tr>
+                <td><strong>${escapeHtml(item.element)}</strong></td>
+                <td>
+                  <strong>${escapeHtml(item.role)}</strong>
+                  <span class="secondary-text">${escapeHtml(item.linkedTo)}</span>
+                </td>
+                <td>
+                  <span class="pill ${
+                    showExternalRequirementStatus
+                      ? `design-${escapeHtml(designAssessment)}`
+                      : `item-${escapeHtml(
+                          assessment.applicability !== "applies" && item.recommendation === "remove"
+                            ? "simplify"
+                            : item.recommendation,
+                        )}`
+                  }">
+                    ${escapeHtml(getProtocolGuardrailItemDisplayLabel(item, assessment.applicability))}
+                  </span>
+                </td>
+                ${
+                  showExternalRequirementStatus
+                    ? `<td><span class="pill requirement-${escapeHtml(externalStatus.replaceAll("_", "-"))}">${escapeHtml(
+                        getExternalRequirementStatusLabel(externalStatus),
+                      )}</span></td>`
+                    : ""
+                }
+                <td>${escapeHtml(getProtocolGuardrailItemRationale(item, assessment.applicability))}</td>
+                <td>${item.destinations.length ? escapeHtml(item.destinations.map((destination) => destination.label).join(" → ")) : "Not applicable."}</td>
+              </tr>`
+          })
+          .join("")}`,
+    )
+    .join("")
+  const impactAssessmentHtml =
+    impactAssessment.generatedAt && impactAssessment.domains.length
+      ? `
+        <div class="impact-summary">
+          <p>${escapeHtml(impactAssessment.executiveSummary)}</p>
+          <p class="secondary-text">Generated ${escapeHtml(formatTimestamp(impactAssessment.generatedAt))}</p>
+        </div>
+        <div class="impact-grid">
+          ${impactAssessment.domains
+            .map(
+              (domain) => `
+                <div class="impact-card">
+                  <div class="impact-card-heading">
+                    <strong>${escapeHtml(domain.label)}</strong>
+                    <span class="pill impact-${escapeHtml(domain.impact)}">${escapeHtml(getImpactLabel(domain.impact))}</span>
+                  </div>
+                  <p class="secondary-text">Score ${escapeHtml(String(domain.score))}</p>
+                  <p>${escapeHtml(domain.rationale)}</p>
+                </div>`,
+            )
+            .join("")}
+        </div>
+        <div class="impact-columns">
+          <div class="impact-limits">
+            <strong>Current limits</strong>
+            ${listToHtml(impactAssessment.blockers.length ? impactAssessment.blockers : ["No major blockers flagged from the current Tab 1 inputs."])}
+          </div>
+          <div class="impact-actions">
+            <strong>What would strengthen impact</strong>
+            ${listToHtml(
+              impactAssessment.strengthenActions.length
+                ? impactAssessment.strengthenActions
+                : ["The current concept already covers the main strengthening levers visible from Tab 1."],
+            )}
+          </div>
+        </div>`
+      : `
+        <div class="impact-empty">
+          The evidence impact assessment has not been generated. Complete disease, intervention or exposure, and primary objective, then rerun the combined analysis.
+        </div>`
+
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(study.studyTitle || "Design Complexity and Impact Analysis")}</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #1f2937; margin: 36px; line-height: 1.5; }
+      h1 { color: #1864ab; margin-bottom: 8px; }
+      h2 { color: #111827; margin: 28px 0 10px; }
+      p { margin: 0 0 10px; }
+      .meta { color: #475569; margin-bottom: 20px; }
+      .summary { border: 1px solid #bae6fd; border-radius: 10px; padding: 14px; background: #f0f9ff; color: #0c4a6e; }
+      .profile { display: inline-block; border: 1px solid #cbd5e1; border-radius: 999px; padding: 4px 10px; background: #f8fafc; color: #334155; font-size: 12px; font-weight: 700; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+      th, td { border: 1px solid #cbd5e1; padding: 10px; vertical-align: top; text-align: left; }
+      th { background: #f1f5f9; color: #0f172a; }
+      .trace, .stages { display: grid; gap: 12px; }
+      .trace { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .stages { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .trace-item, .stage { border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px; background: #ffffff; }
+      .trace-label, .stage-sequence { margin: 0 0 5px; color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+      .trace-item.incomplete { border-color: #fde68a; background: #fffbeb; }
+      .decision-context { margin-top: 12px; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px; background: #f8fafc; }
+      .decision-context p:last-child { margin-bottom: 0; }
+      .stage-aligned { border-color: #a7f3d0; background: #ecfdf5; }
+      .stage-needs-justification { border-color: #fde68a; background: #fffbeb; }
+      .stage-consider-simplifying { border-color: #fecdd3; background: #fff1f2; }
+      .reconciliation-table { table-layout: fixed; }
+      .reconciliation-table th { background: #0f172a; color: #ffffff; }
+      .reconciliation-table .group-row td { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .reconciliation-table .group-row span { display: block; margin-top: 2px; font-size: 11px; }
+      .secondary-text { display: block; margin-top: 4px; color: #64748b; font-size: 11px; }
+      .item-retain { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .item-align { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .item-simplify { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .item-remove { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+      .design-core { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .design-supportive { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .design-unclear { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .design-overlap { border-color: #ddd6fe; background: #f5f3ff; color: #5b21b6; }
+      .design-disproportionate, .design-multiplicity { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+      .requirement-documented { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .requirement-mentioned { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .requirement-not-provided, .requirement-not-applicable { border-color: #cbd5e1; background: #f8fafc; color: #475569; }
+      .pill { display: inline-block; border: 1px solid #cbd5e1; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700; line-height: 1.25; }
+      .status-aligned { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .status-needs-justification { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .status-consider-simplifying { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+      .impact-summary { border: 1px solid #cbd5e1; padding: 14px; background: #f8fafc; }
+      .impact-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+      .impact-card { border: 1px solid #cbd5e1; padding: 12px; background: #ffffff; }
+      .impact-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+      .impact-high { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .impact-medium { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .impact-low { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+      .impact-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+      .impact-limits, .impact-actions, .impact-empty { border: 1px solid #cbd5e1; padding: 14px; }
+      .impact-limits { border-color: #fecdd3; background: #fff1f2; color: #881337; }
+      .impact-actions { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .impact-empty { border-style: dashed; background: #f8fafc; color: #475569; }
+      ul { margin: 8px 0 0 20px; padding: 0; }
+      @page { size: landscape; margin: 14mm; }
+      @media print { body { margin: 0; } tr { page-break-inside: avoid; } }
+      @media (max-width: 800px) { .trace, .stages, .impact-grid, .impact-columns { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <h1>Design Complexity and Impact Analysis</h1>
+    <div class="meta">
+      <p><strong>Study:</strong> ${escapeHtml(study.studyTitle || "Untitled study")}</p>
+      <p><strong>Generated:</strong> ${escapeHtml(formatTimestamp(new Date().toISOString()))}</p>
+      <p><strong>Guardrail profile:</strong> <span class="profile">${escapeHtml(assessment.label)}</span></p>
+      <p><strong>Assessment mode:</strong> ${escapeHtml(assessment.applicabilityLabel)}</p>
+      <p><strong>Study submission / evidence role:</strong> ${escapeHtml(assessment.evidenceRoleLabel)}</p>
+      ${
+        showExternalRequirementStatus
+          ? `<p><strong>External requirements entered:</strong> ${escapeHtml(
+              (study.externalRequirements || "").trim() || "None provided",
+            )}</p>`
+          : ""
+      }
+    </div>
+    <div class="summary">${escapeHtml(assessment.summary)}</div>
+
+    <h2>Decision-to-Design Trace</h2>
+    <div class="trace">
+      ${assessment.trace
+        .map(
+          (item) => `<div class="trace-item ${item.complete ? "" : "incomplete"}">
+            <p class="trace-label">${escapeHtml(item.label)}</p>
+            <p><strong>${escapeHtml(item.value)}</strong></p>
+          </div>`,
+        )
+        .join("")}
+    </div>
+    <div class="decision-context">
+      <p><strong>Primary decision category:</strong> ${escapeHtml(assessment.primaryDecisionLabel || "Not defined")}</p>
+      <p><strong>Secondary decisions:</strong> ${escapeHtml(assessment.secondaryDecisionLabels.join(", ") || "None selected")}</p>
+      <p><strong>Additional planned outputs:</strong> ${escapeHtml(assessment.dissemination.join(", ") || "None selected")}</p>
+      <p>Dissemination outputs do not make endpoints or data collection decision-critical by themselves.</p>
+    </div>
+
+    <h2>Evidence Impact Outlook</h2>
+    <p>Use this outlook to prioritize the objectives, endpoints, and design features reviewed below. The primary decision remains the governing constraint.</p>
+    ${impactAssessmentHtml}
+
+    <h2>Review Hierarchy</h2>
+    <div class="stages">
+      ${assessment.stages
+        .map(
+          (stage) => `<div class="stage stage-${escapeHtml(stage.status.replaceAll("_", "-"))}">
+            <p class="stage-sequence">Step ${stage.sequence}</p>
+            <p><strong>${escapeHtml(stage.label)}</strong></p>
+            <p>${escapeHtml(stage.description)}</p>
+            <span class="pill status-${escapeHtml(stage.status.replaceAll("_", "-"))}">${escapeHtml(getProtocolGuardrailStatusLabel(stage.status, assessment.applicability))}</span>
+          </div>`,
+        )
+        .join("")}
+    </div>
+
+    <h2>Element-Level Reconciliation</h2>
+    <p>${escapeHtml(
+      assessment.applicability === "external_requirements"
+        ? "Review design contribution separately from external-requirement evidence. Missing authority input does not prevent overlap, multiplicity, timing, cost, or burden checks."
+        : assessment.applicability === "general_complexity"
+          ? "Review purpose, alignment, overlap, and burden descriptively while the study role remains unconfirmed."
+          : "Review each protocol element in hierarchy. Clarify alignment before retaining, simplifying, or removing downstream collection.",
+    )}</p>
+    <table class="reconciliation-table">
+      <colgroup>
+        ${
+          showExternalRequirementStatus
+            ? `<col style="width: 23%" /><col style="width: 16%" /><col style="width: 14%" /><col style="width: 14%" /><col style="width: 25%" /><col style="width: 8%" />`
+            : `<col style="width: 28%" /><col style="width: 19%" /><col style="width: 14%" /><col style="width: 27%" /><col style="width: 12%" />`
+        }
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Protocol element</th>
+          <th>Role and link</th>
+          <th>${showExternalRequirementStatus ? "Design assessment" : "Recommendation"}</th>
+          ${showExternalRequirementStatus ? "<th>External basis</th>" : ""}
+          <th>Rationale</th>
+          <th>Edit in</th>
+        </tr>
+      </thead>
+      <tbody>${reconciliationGroupsHtml}</tbody>
+    </table>
+
+  </body>
+</html>`
+}
+
+function evidenceNavigatorToHtml(navigator: EvidenceNavigator, study: StudyForm) {
+  if (!navigator.generatedAt || !navigator.items.length) {
+    return ""
+  }
+
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(study.studyTitle || "Data-to-Evidence Navigator")}</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #1f2937; margin: 36px; line-height: 1.5; }
+      h1 { color: #1864ab; margin-bottom: 8px; }
+      h2 { color: #111827; margin-top: 28px; margin-bottom: 10px; }
+      p { margin: 0 0 10px 0; }
+      .meta { color: #475569; margin-bottom: 20px; }
+      .coverage { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+      .card { border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px; background: #f8fafc; }
+      .coverage-strong { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .coverage-partial { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .coverage-weak { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .coverage-missing { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+      .kicker { color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+      th, td { border: 1px solid #cbd5e1; padding: 8px; vertical-align: top; text-align: left; }
+      th { background: #f1f5f9; color: #0f172a; }
+      ul { margin: 6px 0 0 18px; padding: 0; }
+      .pill { display: inline-block; border: 1px solid #cbd5e1; border-radius: 999px; padding: 3px 9px; margin: 0 4px 4px 0; font-size: 11px; font-weight: 700; line-height: 1.25; }
+      .role, .neutral { border-color: #e2e8f0; background: #f8fafc; color: #334155; }
+      .impact-high { border-color: #bbf7d0; background: #dcfce7; color: #166534; }
+      .impact-medium { border-color: #7dd3fc; background: #f0f9ff; color: #1864ab; }
+      .impact-low { border-color: #fecdd3; background: #ffe4e6; color: #9f1239; }
+      .cost-low { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .cost-medium { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .cost-high { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .cost-very-high { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+      .cost-depends { border-color: #e2e8f0; background: #f8fafc; color: #334155; }
+      .timeline-high { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+      .timeline-medium { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .timeline-low { border-color: #e2e8f0; background: #f8fafc; color: #334155; }
+      .clinical-direct { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .clinical-contextual { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .clinical-hypothesis-generating { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .readiness-decision-ready { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .readiness-supportive { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .readiness-hypothesis-generating { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .readiness-not-ready { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+      .priority-high { border-color: #334155; background: #0f172a; color: #ffffff; }
+      .priority-moderate { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .priority-low { border-color: #e2e8f0; background: #f8fafc; color: #334155; }
+      .recommendation-keep { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+      .recommendation-add { border-color: #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+      .recommendation-simplify { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+      .recommendation-remove { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+      .recommendation-optional { border-color: #e2e8f0; background: #f8fafc; color: #334155; }
+      .gaps { border: 1px solid #fecdd3; border-radius: 10px; padding: 12px; background: #fff1f2; color: #881337; }
+      .muted { color: #64748b; font-size: 11px; }
+      .link-label { margin: 0 0 2px 0; color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+      .outcome { margin: 0 0 9px 0; padding-left: 8px; border-left: 2px solid #cbd5e1; }
+      .outcome strong { display: block; font-size: 11px; }
+      .outcome-supportive { border-color: #86efac; }
+      .outcome-supportive strong { color: #166534; }
+      .outcome-inconclusive { border-color: #fcd34d; }
+      .outcome-inconclusive strong { color: #92400e; }
+      .outcome-absent { border-color: #fda4af; }
+      .outcome-absent strong { color: #9f1239; }
+      .focus-rule { border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px; background: #f8fafc; color: #334155; }
+      .capture-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+      .capture-card { border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px; background: #f8fafc; }
+      .capture-card dt { margin-top: 10px; color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+      .capture-card dd { margin: 2px 0 0; }
+    </style>
+  </head>
+  <body>
+    <h1>Data-to-Evidence Navigator</h1>
+    <div class="meta">
+      <p><strong>Study:</strong> ${escapeHtml(study.studyTitle || "Untitled study")}</p>
+      <p><strong>Generated:</strong> ${escapeHtml(formatTimestamp(navigator.generatedAt))}</p>
+      <p><strong>Source:</strong> ${navigator.provenance === "ai_generated" ? "AI generated" : "Local draft"}</p>
+    </div>
+    <p>${escapeHtml(navigator.executiveSummary)}</p>
+
+    <h2>Evidence Coverage</h2>
+    <div class="coverage">
+      ${navigator.coverage
+        .map(
+          (item) => `
+            <div class="card coverage-${escapeHtml(item.status)}">
+              <p class="kicker">${escapeHtml(item.status)}</p>
+              <p><strong>${escapeHtml(item.area)}</strong></p>
+              <p>${escapeHtml(item.rationale)}</p>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+
+    <h2>Missing Or Weak Opportunities</h2>
+    <div class="gaps">${listToHtml(navigator.gaps)}</div>
+
+    <div class="focus-rule"><strong>Focus rule:</strong> Recommend adding a data domain only when it is high decision importance and directly supports a stated objective, endpoint, safety need, estimand, or declared evidence-use decision. Other domains remain optional or are candidates to simplify.</div>
+
+    <h2>Evidence Opportunity Matrix</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Data domain</th>
+          <th>Evidence linkage</th>
+          <th>Clinical relevance</th>
+          <th>Burden / value / cost / timeline</th>
+          <th>SoA rows</th>
+          <th>Analyses and future opportunities</th>
+          <th>Evidence outcome</th>
+          <th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${navigator.items
+          .map(
+            (item) => `
+              <tr>
+                <td><strong>${escapeHtml(item.dataDomain)}</strong></td>
+                <td>
+                  <p class="link-label">${escapeHtml(getObjectiveLinkLabel(item.requiredFor))}</p>
+                  <p>${escapeHtml(item.objectiveLink || "Not specified")}</p>
+                  <p class="link-label">${escapeHtml(getEndpointLinkLabel(item.requiredFor))}</p>
+                  <p>${escapeHtml(item.endpointOrEstimand || "Not specified")}</p>
+                  <span class="pill role">${escapeHtml(getEvidencePurposeLabel(item.requiredFor))}</span>
+                </td>
+                <td>
+                  <span class="pill clinical-${escapeHtml(item.clinicalRelevance.replaceAll("_", "-"))}">${escapeHtml(formatClinicalRelevance(item.clinicalRelevance))}</span>
+                  <span class="pill readiness-${escapeHtml(item.analysisReadiness.replaceAll("_", "-"))}">${escapeHtml(formatAnalysisReadiness(item.analysisReadiness))}</span>
+                  <span class="pill priority-${escapeHtml(item.decisionImportance)}">${escapeHtml(item.decisionImportance)} decision importance</span>
+                  <p class="muted">${escapeHtml(item.clinicalRelevanceRationale)}</p>
+                </td>
+                <td>
+                  <span class="pill impact-${escapeHtml(item.collectionBurden)}">${escapeHtml(item.collectionBurden)} burden</span><span class="pill impact-${escapeHtml(item.evidenceValue)}">${escapeHtml(item.evidenceValue)} value</span>
+                  <span class="pill cost-${escapeHtml(item.costImplication.replaceAll("_", "-"))}">${escapeHtml(formatCostImplication(item.costImplication))}</span>
+                  <span class="pill cost-${escapeHtml(item.dataCollectionCost.replaceAll("_", "-"))}">${escapeHtml(formatCostImplication(item.dataCollectionCost))} collection</span>
+                  <span class="pill timeline-${escapeHtml(item.followUpDurationImpact)}">${escapeHtml(item.followUpDurationImpact)} timeline impact</span>
+                  <span class="pill neutral">${escapeHtml(formatCostValueJudgment(item.costValueJudgment))}</span>
+                  <p class="muted">${escapeHtml(item.costRationale)}</p>
+                  <p class="muted"><strong>Timeline:</strong> ${escapeHtml(item.followUpDurationRationale)}</p>
+                  ${item.costDrivers.length ? `<p class="muted"><strong>Drivers:</strong> ${item.costDrivers.map(escapeHtml).join(", ")}</p>` : ""}
+                </td>
+                <td>${item.soaRows.length ? item.soaRows.map(escapeHtml).join("<br />") : "Not currently mapped"}</td>
+                <td><p><strong>Analyses</strong></p>${listToHtml(item.analysesUnlocked)}<p><strong>Future opportunities</strong></p>${listToHtml(item.futureOpportunities)}</td>
+                <td>
+                  <div class="outcome outcome-supportive"><strong>If supportive</strong>${escapeHtml(item.supportiveEvidenceMessage)}</div>
+                  <div class="outcome outcome-inconclusive"><strong>If inconclusive</strong>${escapeHtml(item.inconclusiveEvidenceRisk)}</div>
+                  <div class="outcome outcome-absent"><strong>If not collected</strong>${escapeHtml(item.ifMissing)}</div>
+                </td>
+                <td><span class="pill recommendation-${escapeHtml(item.recommendation)}">${escapeHtml(item.recommendation)}</span></td>
+              </tr>
+            `,
+          )
+          .join("")}
+      </tbody>
+    </table>
+
+    <h2>Collection And Analysis Conditions</h2>
+    <p>These are the minimum conditions for the stated decision use, not a request to add every possible data domain.</p>
+    <div class="capture-grid">
+      ${navigator.items
+        .map(
+          (item) => `
+            <div class="capture-card">
+              <p><strong>${escapeHtml(item.dataDomain)}</strong></p>
+              <span class="pill readiness-${escapeHtml(item.analysisReadiness.replaceAll("_", "-"))}">${escapeHtml(formatAnalysisReadiness(item.analysisReadiness))}</span>
+              <span class="pill priority-${escapeHtml(item.decisionImportance)}">${escapeHtml(item.decisionImportance)} priority</span>
+              <dl>
+                <dt>Decision use</dt>
+                <dd>${escapeHtml(item.decisionUse)}</dd>
+                <dt>Source and timepoints</dt>
+                <dd>${escapeHtml(item.dataCaptureSource)}${item.keyCollectionTimepoints.length ? `: ${item.keyCollectionTimepoints.map(escapeHtml).join("; ")}` : ""}</dd>
+                <dt>Minimum quality condition</dt>
+                <dd>${escapeHtml(item.minimumDataQuality)}</dd>
+                <dt>Decision audience</dt>
+                <dd>${item.decisionAudience.length ? item.decisionAudience.map(escapeHtml).join(", ") : "Not specified"}</dd>
+              </dl>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+
+    <h2>Simulator Options</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Option</th>
+          <th>Status</th>
+          <th>Burden / value</th>
+          <th>Analyses unlocked</th>
+          <th>Trade-off</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${navigator.simulatorOptions
+          .map(
+            (option) => `
+              <tr>
+                <td><strong>${escapeHtml(option.label)}</strong></td>
+                <td><span class="pill neutral">${escapeHtml(option.currentStatus)}</span></td>
+                <td><span class="pill impact-${escapeHtml(option.collectionBurden)}">${escapeHtml(option.collectionBurden)} burden</span><span class="pill impact-${escapeHtml(option.evidenceValue)}">${escapeHtml(option.evidenceValue)} value</span></td>
+                <td>${listToHtml(option.analysesUnlocked)}</td>
+                <td>${escapeHtml(option.tradeoff)}</td>
+              </tr>
+            `,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  </body>
+</html>`
 }
 
 function slugify(value: string) {
@@ -8284,6 +11650,7 @@ function OverlayModal({
   description,
   onClose,
   children,
+  size = "default",
 }: {
   open: boolean
   eyebrow?: string
@@ -8291,6 +11658,7 @@ function OverlayModal({
   description?: string
   onClose: () => void
   children: ReactNode
+  size?: "default" | "wide" | "full"
 }) {
   if (!open) {
     return null
@@ -8299,7 +11667,9 @@ function OverlayModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" onClick={onClose}>
       <div
-        className="max-h-[88vh] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_30px_120px_rgba(15,23,42,0.24)]"
+        className={`max-h-[88vh] w-full overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_30px_120px_rgba(15,23,42,0.24)] ${
+          size === "full" ? "max-w-[min(96vw,1720px)]" : size === "wide" ? "max-w-[min(94vw,1320px)]" : "max-w-4xl"
+        }`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
@@ -8581,6 +11951,7 @@ function StudySchemaPreview({
 function ScheduleTable({
   schedule,
   editable = false,
+  evidenceBadges,
   onRowChange,
   onCellChange,
   onRemoveRow,
@@ -8591,6 +11962,7 @@ function ScheduleTable({
 }: {
   schedule: ScheduleForm
   editable?: boolean
+  evidenceBadges?: Record<string, string[]>
   onRowChange?: (rowId: string, updates: Partial<ScheduleRow>) => void
   onCellChange?: (rowId: string, columnId: string, value: string) => void
   onRemoveRow?: (rowId: string) => void
@@ -8614,6 +11986,8 @@ function ScheduleTable({
   const stickyActivityWidth = editable ? 250 : 260
   const visitColumnWidth = editable ? 92 : 104
   const notesColumnWidth = editable ? 210 : 220
+  const showNotesColumn = shouldShowScheduleNotes(schedule)
+  const fixedColumnCount = 2 + (showNotesColumn ? 1 : 0) + (editable ? 1 : 0)
 
   return (
     <div className="w-full overflow-x-auto rounded-[24px] border border-slate-200 bg-white">
@@ -8656,13 +12030,15 @@ function ScheduleTable({
                 )}
               </th>
             ))}
-            <th
-              rowSpan={3}
-              style={{ minWidth: notesColumnWidth, width: notesColumnWidth }}
-              className="border border-slate-200 bg-slate-50 px-3 py-3 text-left font-semibold"
-            >
-              Notes
-            </th>
+            {showNotesColumn && (
+              <th
+                rowSpan={3}
+                style={{ minWidth: notesColumnWidth, width: notesColumnWidth }}
+                className="border border-slate-200 bg-slate-50 px-3 py-3 text-left font-semibold"
+              >
+                Notes
+              </th>
+            )}
             {editable && (
               <th rowSpan={3} className="min-w-[70px] border border-slate-200 bg-slate-50 px-3 py-3 text-center font-semibold">
                 Row
@@ -8740,7 +12116,7 @@ function ScheduleTable({
             <Fragment key={`${group.group}-${groupIndex}`}>
               <tr className="bg-amber-50 text-amber-950">
                 <td
-                  colSpan={schedule.columns.length + (editable ? 4 : 3)}
+                  colSpan={schedule.columns.length + fixedColumnCount}
                   className="border border-amber-200 px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em]"
                 >
                   {group.group}
@@ -8748,6 +12124,7 @@ function ScheduleTable({
               </tr>
               {group.rows.map((row, rowIndex) => {
                 const stickyCellBg = rowIndex % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+                const rowEvidenceBadges = evidenceBadges?.[row.id] || []
 
                 return (
                   <tr key={row.id} className="align-top odd:bg-white even:bg-slate-50/50">
@@ -8771,14 +12148,36 @@ function ScheduleTable({
                       className={`sticky z-20 border border-slate-200 px-2 py-2 shadow-[2px_0_0_rgba(226,232,240,0.95)] ${stickyCellBg}`}
                     >
                       {editable ? (
-                        <input
-                          value={row.activity}
-                          onChange={(event) => onRowChange?.(row.id, { activity: event.target.value })}
-                          title={row.activity}
-                          className="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs leading-tight text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
-                        />
+                        <div className="space-y-2">
+                          <input
+                            value={row.activity}
+                            onChange={(event) => onRowChange?.(row.id, { activity: event.target.value })}
+                            title={row.activity}
+                            className="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs leading-tight text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                          />
+                          {rowEvidenceBadges.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {rowEvidenceBadges.slice(0, 3).map((badge) => (
+                                <span key={badge} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                                  {badge}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        <div className="min-w-[240px] px-1 py-1 text-sm text-slate-700">{row.activity}</div>
+                        <div className="min-w-[240px] px-1 py-1">
+                          <div className="text-sm text-slate-700">{row.activity}</div>
+                          {rowEvidenceBadges.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {rowEvidenceBadges.slice(0, 3).map((badge) => (
+                                <span key={badge} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                                  {badge}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </td>
                     {schedule.columns.map((column) => (
@@ -8799,18 +12198,20 @@ function ScheduleTable({
                         )}
                       </td>
                     ))}
-                    <td style={{ minWidth: notesColumnWidth, width: notesColumnWidth }} className="border border-slate-200 px-2 py-2">
-                      {editable ? (
-                        <textarea
-                          value={row.notes}
-                          onChange={(event) => onRowChange?.(row.id, { notes: event.target.value })}
-                          rows={2}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
-                        />
-                      ) : (
-                        <div className="min-w-[200px] px-1 py-1 text-sm text-slate-600">{row.notes || ""}</div>
-                      )}
-                    </td>
+                    {showNotesColumn && (
+                      <td style={{ minWidth: notesColumnWidth, width: notesColumnWidth }} className="border border-slate-200 px-2 py-2">
+                        {editable ? (
+                          <textarea
+                            value={row.notes}
+                            onChange={(event) => onRowChange?.(row.id, { notes: event.target.value })}
+                            rows={2}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
+                          />
+                        ) : (
+                          <div className="min-w-[200px] px-1 py-1 text-sm text-slate-600">{row.notes || ""}</div>
+                        )}
+                      </td>
+                    )}
                     {editable && (
                       <td className="border border-slate-200 px-2 py-2 text-center">
                         <button
@@ -8907,6 +12308,433 @@ function ImpactAssessmentPanel({ assessment }: { assessment: ImpactAssessment })
         </div>
       </div>
     </div>
+  )
+}
+
+function getEvidenceCoverageTone(status: EvidenceCoverageStatus) {
+  if (status === "strong") return "border-emerald-200 bg-emerald-50 text-emerald-900"
+  if (status === "partial") return "border-sky-200 bg-sky-50 text-sky-900"
+  if (status === "weak") return "border-amber-200 bg-amber-50 text-amber-900"
+  return "border-rose-200 bg-rose-50 text-rose-900"
+}
+
+function getRecommendationTone(recommendation: EvidenceRecommendation) {
+  if (recommendation === "keep") return "border-emerald-200 bg-emerald-50 text-emerald-900"
+  if (recommendation === "add") return "border-sky-200 bg-sky-50 text-sky-900"
+  if (recommendation === "simplify") return "border-amber-200 bg-amber-50 text-amber-900"
+  if (recommendation === "remove") return "border-rose-200 bg-rose-50 text-rose-900"
+  return "border-slate-200 bg-slate-50 text-slate-700"
+}
+
+function getCostTone(cost: CostImplication) {
+  if (cost === "low") return "border-emerald-200 bg-emerald-50 text-emerald-900"
+  if (cost === "medium") return "border-sky-200 bg-sky-50 text-sky-900"
+  if (cost === "high") return "border-amber-200 bg-amber-50 text-amber-900"
+  if (cost === "very_high") return "border-rose-200 bg-rose-50 text-rose-900"
+  return "border-slate-200 bg-slate-50 text-slate-700"
+}
+
+function getFollowUpImpactTone(impact: AnalysisImpact) {
+  if (impact === "high") return "border-rose-200 bg-rose-50 text-rose-900"
+  if (impact === "medium") return "border-amber-200 bg-amber-50 text-amber-900"
+  return "border-slate-200 bg-slate-50 text-slate-700"
+}
+
+function formatCostImplication(cost: CostImplication) {
+  if (cost === "very_high") return "very high cost"
+  if (cost === "depends") return "cost depends"
+  return `${cost} cost`
+}
+
+function formatCostValueJudgment(judgment: CostValueJudgment) {
+  return judgment.replaceAll("_", " ")
+}
+
+function getEvidencePurposeLabel(requiredFor: EvidenceRequiredFor) {
+  if (requiredFor === "heor") return "HEOR"
+  return requiredFor
+}
+
+function getObjectiveLinkLabel(requiredFor: EvidenceRequiredFor) {
+  if (requiredFor === "primary") return "Primary objective"
+  if (requiredFor === "secondary") return "Secondary objective"
+  if (requiredFor === "exploratory") return "Exploratory objective"
+  if (requiredFor === "safety") return "Safety objective"
+  if (requiredFor === "heor") return "HEOR objective"
+  return "Publication objective"
+}
+
+function getEndpointLinkLabel(requiredFor: EvidenceRequiredFor) {
+  if (requiredFor === "primary") return "Primary endpoint / estimand"
+  if (requiredFor === "secondary") return "Secondary endpoint / estimand"
+  if (requiredFor === "exploratory") return "Exploratory endpoint / analysis"
+  if (requiredFor === "safety") return "Safety endpoint / analysis"
+  if (requiredFor === "heor") return "HEOR endpoint / analysis"
+  return "Publication-relevant analysis"
+}
+
+function getClinicalRelevanceTone(relevance: ClinicalRelevance) {
+  if (relevance === "direct") return "border-emerald-200 bg-emerald-50 text-emerald-900"
+  if (relevance === "contextual") return "border-sky-200 bg-sky-50 text-sky-900"
+  return "border-amber-200 bg-amber-50 text-amber-900"
+}
+
+function formatClinicalRelevance(relevance: ClinicalRelevance) {
+  return relevance.replaceAll("_", " ")
+}
+
+function getAnalysisReadinessTone(readiness: AnalysisReadiness) {
+  if (readiness === "decision_ready") return "border-emerald-200 bg-emerald-50 text-emerald-900"
+  if (readiness === "supportive") return "border-sky-200 bg-sky-50 text-sky-900"
+  if (readiness === "hypothesis_generating") return "border-amber-200 bg-amber-50 text-amber-900"
+  return "border-rose-200 bg-rose-50 text-rose-900"
+}
+
+function getDecisionImportanceTone(importance: DecisionImportance) {
+  if (importance === "high") return "border-slate-700 bg-slate-900 text-white"
+  if (importance === "moderate") return "border-sky-200 bg-sky-50 text-sky-900"
+  return "border-slate-200 bg-slate-50 text-slate-700"
+}
+
+function formatAnalysisReadiness(readiness: AnalysisReadiness) {
+  return readiness.replaceAll("_", " ")
+}
+
+function EvidenceLinkageCell({ item }: { item: EvidenceMapItem }) {
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{getObjectiveLinkLabel(item.requiredFor)}</p>
+        <p className="mt-0.5 text-xs leading-5 text-slate-700">{item.objectiveLink || "Not specified"}</p>
+      </div>
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{getEndpointLinkLabel(item.requiredFor)}</p>
+        <p className="mt-0.5 text-xs leading-5 text-slate-700">{item.endpointOrEstimand || "Not specified"}</p>
+      </div>
+      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+        {getEvidencePurposeLabel(item.requiredFor)}
+      </span>
+    </div>
+  )
+}
+
+function ClinicalRelevanceBadge({ item }: { item: EvidenceMapItem }) {
+  return (
+    <div>
+      <span className="inline-flex items-center gap-1.5">
+        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getClinicalRelevanceTone(item.clinicalRelevance)}`}>
+          {formatClinicalRelevance(item.clinicalRelevance)}
+        </span>
+        <InfoTooltip
+          label={`Clinical relevance for ${item.dataDomain}`}
+          content={
+            <div>
+              <p className="font-semibold text-slate-900">Clinical relevance</p>
+              <p className="mt-1 text-slate-600">{item.clinicalRelevanceRationale}</p>
+            </div>
+          }
+        />
+      </span>
+      <p className="mt-2 text-xs leading-5 text-slate-600">{item.clinicalRelevanceRationale}</p>
+    </div>
+  )
+}
+
+function AnalysisReadinessBadges({ item }: { item: EvidenceMapItem }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getAnalysisReadinessTone(item.analysisReadiness)}`}>
+        {formatAnalysisReadiness(item.analysisReadiness)}
+      </span>
+      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getDecisionImportanceTone(item.decisionImportance)}`}>
+        {item.decisionImportance} decision importance
+      </span>
+      <InfoTooltip
+        label={`Decision use for ${item.dataDomain}`}
+        content={
+          <div className="space-y-3">
+            <div>
+              <p className="font-semibold text-slate-900">Decision use</p>
+              <p className="mt-1 text-slate-600">{item.decisionUse}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Decision audience</p>
+              <p className="mt-1 text-slate-600">{item.decisionAudience.length ? item.decisionAudience.join(", ") : "Not specified"}</p>
+            </div>
+          </div>
+        }
+      />
+    </div>
+  )
+}
+
+function EvidenceCapturePlanningPanel({ items }: { items: EvidenceMapItem[] }) {
+  return (
+    <div className="mt-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Collection and analysis conditions</p>
+          <h4 className="mt-1 text-lg font-semibold text-slate-950">What makes each intended analysis credible</h4>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-slate-600">
+          These are the minimum collection conditions for the stated decision use, not a request to add every possible data domain.
+        </p>
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {items.map((item) => (
+          <div key={`planning-${item.id}`} className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <p className="font-semibold text-slate-950">{item.dataDomain}</p>
+              <div className="flex flex-wrap justify-end gap-2">
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getAnalysisReadinessTone(item.analysisReadiness)}`}>
+                  {formatAnalysisReadiness(item.analysisReadiness)}
+                </span>
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getDecisionImportanceTone(item.decisionImportance)}`}>
+                  {item.decisionImportance} priority
+                </span>
+              </div>
+            </div>
+            <dl className="mt-4 space-y-3 text-sm leading-6">
+              <div>
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Decision use</dt>
+                <dd className="mt-0.5 text-slate-700">{item.decisionUse}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Source and timepoints</dt>
+                <dd className="mt-0.5 text-slate-700">
+                  {item.dataCaptureSource}
+                  {item.keyCollectionTimepoints.length ? `: ${item.keyCollectionTimepoints.join("; ")}` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Minimum quality condition</dt>
+                <dd className="mt-0.5 text-slate-700">{item.minimumDataQuality}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Decision audience</dt>
+                <dd className="mt-0.5 text-slate-700">{item.decisionAudience.length ? item.decisionAudience.join(", ") : "Not specified"}</dd>
+              </div>
+            </dl>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EvidenceOutcomeCell({ item }: { item: EvidenceMapItem }) {
+  return (
+    <div className="space-y-3 text-xs leading-5">
+      <div className="border-l-2 border-emerald-300 pl-2.5">
+        <p className="font-semibold text-emerald-800">If supportive</p>
+        <p className="mt-0.5 text-slate-700">{item.supportiveEvidenceMessage}</p>
+      </div>
+      <div className="border-l-2 border-amber-300 pl-2.5">
+        <p className="font-semibold text-amber-800">If inconclusive</p>
+        <p className="mt-0.5 text-slate-700">{item.inconclusiveEvidenceRisk}</p>
+      </div>
+      <div className="border-l-2 border-rose-300 pl-2.5">
+        <p className="font-semibold text-rose-800">If not collected</p>
+        <p className="mt-0.5 text-slate-700">{item.ifMissing}</p>
+      </div>
+    </div>
+  )
+}
+
+function CostImplicationBadge({ item }: { item: EvidenceMapItem }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getCostTone(item.costImplication)}`}>
+        {formatCostImplication(item.costImplication)}
+      </span>
+      <InfoTooltip
+        label={`Cost explanation for ${item.dataDomain}`}
+        content={
+          <div className="space-y-3">
+          <div>
+              <p className="font-semibold text-slate-900">Overall planning cost</p>
+              <p className="mt-1 text-slate-600">{item.costRationale || "Cost depends on local operational and vendor assumptions."}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Direct data-collection cost</p>
+              <p className="mt-1 text-slate-600">{formatCostImplication(item.dataCollectionCost)}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Follow-up and timeline impact</p>
+              <p className="mt-1 text-slate-600">
+                {item.followUpDurationImpact} impact. {item.followUpDurationRationale}
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Main drivers</p>
+              <p className="mt-1 text-slate-600">
+                {item.costDrivers.length ? item.costDrivers.join(", ") : "site time, data-management effort, vendor needs, and assessment frequency"}
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Value-for-cost judgment</p>
+              <p className="mt-1 text-slate-600">{formatCostValueJudgment(item.costValueJudgment)}</p>
+            </div>
+          </div>
+        }
+      />
+    </span>
+  )
+}
+
+function EvidenceNavigatorPanel({ navigator }: { navigator: EvidenceNavigator }) {
+  if (!navigator.generatedAt || !navigator.items.length) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
+        Generate the Data-to-Evidence Navigator to map SoA data domains to analyses, future opportunities, evidence impact, and missing-data consequences.
+      </div>
+    )
+  }
+
+  return (
+    <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Data-to-Evidence Navigator</p>
+          <h3 className="mt-2 text-2xl font-semibold text-slate-950">Evidence consequences of the current SoA</h3>
+        </div>
+        <div className="text-right text-xs text-slate-500">
+          <p>{navigator.provenance === "ai_generated" ? "AI generated" : "Local draft"}</p>
+          <p className="mt-1">{formatTimestamp(navigator.generatedAt)}</p>
+        </div>
+      </div>
+
+      <p className="mt-4 text-sm leading-7 text-slate-600">{navigator.executiveSummary}</p>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        {navigator.coverage.map((item) => (
+          <div key={item.area} className={`rounded-[20px] border p-4 ${getEvidenceCoverageTone(item.status)}`}>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em]">{item.status}</p>
+            <p className="mt-2 font-semibold">{item.area}</p>
+            <p className="mt-2 text-sm leading-6">{item.rationale}</p>
+          </div>
+        ))}
+      </div>
+
+      {navigator.gaps.length > 0 && (
+        <div className="mt-5 rounded-[22px] border border-rose-200 bg-rose-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-800">Missing or weak evidence opportunities</p>
+          <ul className="mt-3 space-y-2 text-sm leading-6 text-rose-950">
+            {navigator.gaps.map((gap) => (
+              <li key={gap}>{gap}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-5 rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
+        <span className="font-semibold text-slate-950">Focus rule:</span> recommend adding a data domain only when it is high decision importance and directly supports a stated objective, endpoint, safety need, estimand, or declared evidence-use decision. Other domains remain optional or are candidates to simplify.
+      </div>
+
+      <div className="mt-5 overflow-hidden rounded-[22px] border border-slate-200">
+        <table className="w-full table-fixed border-collapse text-sm">
+          <colgroup>
+            <col className="w-[13%]" />
+            <col className="w-[17%]" />
+            <col className="w-[14%]" />
+            <col className="w-[13%]" />
+            <col className="w-[14%]" />
+            <col className="w-[21%]" />
+            <col className="w-[8%]" />
+          </colgroup>
+          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <tr>
+              <th className="border border-slate-200 px-3 py-3">Data domain</th>
+              <th className="border border-slate-200 px-3 py-3">Evidence linkage</th>
+              <th className="border border-slate-200 px-3 py-3">Clinical relevance / readiness</th>
+              <th className="border border-slate-200 px-3 py-3">Burden / value / cost / timeline</th>
+              <th className="border border-slate-200 px-3 py-3">Analyses unlocked</th>
+              <th className="border border-slate-200 px-3 py-3">Evidence outcome</th>
+              <th className="border border-slate-200 px-3 py-3">Recommendation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {navigator.items.map((item) => (
+              <tr key={item.id} className="align-top odd:bg-white even:bg-slate-50/40">
+                <td className="break-words border border-slate-200 px-3 py-3">
+                  <p className="font-semibold text-slate-950">{item.dataDomain}</p>
+                  {item.soaRows.length > 0 && (
+                    <p className="mt-2 text-xs leading-5 text-slate-500">SoA: {item.soaRows.join(", ")}</p>
+                  )}
+                </td>
+                <td className="break-words border border-slate-200 px-3 py-3">
+                  <EvidenceLinkageCell item={item} />
+                </td>
+                <td className="break-words border border-slate-200 px-3 py-3">
+                  <ClinicalRelevanceBadge item={item} />
+                  <AnalysisReadinessBadges item={item} />
+                </td>
+                <td className="break-words border border-slate-200 px-3 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getImpactTone(item.collectionBurden)}`}>
+                      {item.collectionBurden} burden
+                    </span>
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getImpactTone(item.evidenceValue)}`}>
+                      {item.evidenceValue} value
+                    </span>
+                    <CostImplicationBadge item={item} />
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getCostTone(item.dataCollectionCost)}`}>
+                      {formatCostImplication(item.dataCollectionCost)} collection
+                    </span>
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getFollowUpImpactTone(item.followUpDurationImpact)}`}>
+                      {item.followUpDurationImpact} timeline impact
+                    </span>
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                      {formatCostValueJudgment(item.costValueJudgment)}
+                    </span>
+                  </div>
+                  {item.costDrivers.length > 0 && (
+                    <p className="mt-2 text-xs leading-5 text-slate-500">Drivers: {item.costDrivers.slice(0, 3).join(", ")}</p>
+                  )}
+                  <p className="mt-2 text-xs leading-5 text-slate-500">Timeline: {item.followUpDurationRationale}</p>
+                </td>
+                <td className="break-words border border-slate-200 px-3 py-3 leading-6 text-slate-700">
+                  <p>{item.analysesUnlocked.slice(0, 3).join("; ")}</p>
+                  {item.futureOpportunities.length > 0 && (
+                    <p className="mt-2 text-xs leading-5 text-slate-500">Future: {item.futureOpportunities.slice(0, 2).join("; ")}</p>
+                  )}
+                </td>
+                <td className="break-words border border-slate-200 px-3 py-3">
+                  <EvidenceOutcomeCell item={item} />
+                </td>
+                <td className="break-words border border-slate-200 px-3 py-3">
+                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getRecommendationTone(item.recommendation)}`}>
+                    {item.recommendation}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <EvidenceCapturePlanningPanel items={navigator.items} />
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        {navigator.simulatorOptions.map((option) => (
+          <div key={option.id} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <p className="font-semibold text-slate-950">{option.label}</p>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">{option.currentStatus}</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getImpactTone(option.collectionBurden)}`}>
+                {option.collectionBurden} burden
+              </span>
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getImpactTone(option.evidenceValue)}`}>
+                {option.evidenceValue} value
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{option.tradeoff}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -9060,6 +12888,7 @@ export default function StudySynopsisStudio() {
   const [literature, setLiterature] = useState<LiteratureForm>(initialLiteratureForm)
   const [schedule, setSchedule] = useState<ScheduleForm>(initialScheduleForm)
   const [scheduleInsights, setScheduleInsights] = useState<ScheduleInsights>(initialScheduleInsights)
+  const [evidenceNavigator, setEvidenceNavigator] = useState<EvidenceNavigator>(initialEvidenceNavigator)
   const [scheduleLayoutRecommendation, setScheduleLayoutRecommendation] = useState<ScheduleLayoutRecommendation>(
     initialScheduleLayoutRecommendation,
   )
@@ -9097,6 +12926,7 @@ export default function StudySynopsisStudio() {
     | "schedule"
     | "schedule_analysis"
     | "schedule_layout"
+    | "evidence_map"
     | "sections"
     | "final"
   >(null)
@@ -9114,8 +12944,9 @@ export default function StudySynopsisStudio() {
   const [openHelpTab, setOpenHelpTab] = useState<TabId | null>(null)
   const [openAiAssistantModal, setOpenAiAssistantModal] = useState<AiAssistantModalKind | null>(null)
   const [openProtocolGuardrailModal, setOpenProtocolGuardrailModal] = useState(false)
-  const [openImpactAssessmentModal, setOpenImpactAssessmentModal] = useState(false)
+  const [protocolGuardrailAnalysisUpdatedAt, setProtocolGuardrailAnalysisUpdatedAt] = useState("")
   const [openScheduleInsightsModal, setOpenScheduleInsightsModal] = useState(false)
+  const [openEvidenceNavigatorModal, setOpenEvidenceNavigatorModal] = useState(false)
   const [openScheduleLayoutRecommendationModal, setOpenScheduleLayoutRecommendationModal] = useState(false)
   const [scheduleInsightsModalMode, setScheduleInsightsModalMode] = useState<ScheduleInsightMode>("complexity")
   const [runningScheduleInsightMode, setRunningScheduleInsightMode] = useState<ScheduleInsightMode | null>(null)
@@ -9128,6 +12959,10 @@ export default function StudySynopsisStudio() {
 
   const clearScheduleInsights = () => {
     setScheduleInsights(initialScheduleInsights)
+  }
+
+  const clearEvidenceNavigator = () => {
+    setEvidenceNavigator(initialEvidenceNavigator)
   }
 
   const clearScheduleLayoutRecommendation = () => {
@@ -9224,6 +13059,7 @@ export default function StudySynopsisStudio() {
     setLiterature(normalized.literature)
     setSchedule(normalized.schedule)
     setScheduleInsights(normalized.scheduleInsights)
+    setEvidenceNavigator(normalized.evidenceNavigator)
     setSections(normalized.sections)
     setFinalSections(normalized.finalSections)
     setReviews(normalized.reviews)
@@ -9239,8 +13075,9 @@ export default function StudySynopsisStudio() {
     setOpenHelpTab(null)
     setOpenAiAssistantModal(null)
     setOpenProtocolGuardrailModal(false)
-    setOpenImpactAssessmentModal(false)
+    setProtocolGuardrailAnalysisUpdatedAt("")
     setOpenScheduleInsightsModal(false)
+    setOpenEvidenceNavigatorModal(false)
     setScheduleInsightsModalMode("complexity")
     setRunningScheduleInsightMode(null)
     setOpenScheduleRegenerationModal(false)
@@ -9309,6 +13146,7 @@ export default function StudySynopsisStudio() {
     literature: { ...literature },
     schedule: normalizeSchedule(schedule),
     scheduleInsights: normalizeScheduleInsights(scheduleInsights),
+    evidenceNavigator: normalizeEvidenceNavigator(evidenceNavigator),
     sections: sections.map((section) => normalizeSection(section)),
     finalSections: [...finalSections],
     reviews: {
@@ -9519,6 +13357,7 @@ export default function StudySynopsisStudio() {
     scheduleInsights.generatedAt &&
       (scheduleInsights.complexity.drivers.length > 0 || scheduleInsights.tradeoff.recommendations.length > 0),
   )
+  const evidenceNavigatorReady = Boolean(evidenceNavigator.generatedAt && evidenceNavigator.items.length)
   const showReviewGates = false
   const includedSections = sections.filter((section) => section.included)
   const scheduleEligible = isScheduleEligibleStudy(study)
@@ -9535,6 +13374,7 @@ export default function StudySynopsisStudio() {
     number
   >
   const scheduleTablePresentation = getScheduleTablePresentation(schedule)
+  const evidenceBadgeMap = buildEvidenceBadgeMap(schedule, evidenceNavigator)
   const canSplitScheduleTable = schedule.columns.length >= 4
   const scheduleColumnAnchor = getScheduleAnchorColumn(schedule, scheduleColumnDraft.anchorColumnId)
   const canAddScheduleColumn = Boolean(
@@ -9590,25 +13430,35 @@ export default function StudySynopsisStudio() {
   const currentProjectMeta = projectMetas.find((project) => project.id === currentProjectId) || null
   const currentProjectName = currentProjectMeta?.name || normalizeProjectName(projectNameDraft, "New synopsis")
   const selectedEvidenceUseIntents = Array.isArray(study.secondaryEvidenceUseIntents) ? study.secondaryEvidenceUseIntents : []
-  const selectedStrategicObjectives = Array.isArray(study.secondaryStrategicObjectives) ? study.secondaryStrategicObjectives : []
   const primaryIntentAlignment = buildPrimaryIntentAlignment(study)
   const suggestedProtocolGuardrailProfile = getSuggestedProtocolGuardrailProfile(study)
   const resolvedProtocolGuardrailProfile = getResolvedProtocolGuardrailProfile(study)
-  const protocolGuardrailAssessment = buildProtocolGuardrailAssessment(study)
+  const resolvedProtocolGuardrailApplicability = getProtocolGuardrailApplicability(study)
+  const usesExternalRequirementsLanguage = ["label_enabling", "regulatory_commitment", "hta_requirement"].includes(
+    getResolvedStudyEvidenceRole(study),
+  )
+  const studyEvidenceRoleLocked = [study.primaryDecisionEnabled, ...(study.secondaryDecisionsEnabled || [])].some(
+    (decision) => decision === "label_regulatory" || decision === "hta_reimbursement",
+  )
+  const protocolGuardrailAssessment = buildProtocolGuardrailAssessment(study, stats, schedule, impactAssessment)
+  const displayedImpactAssessment =
+    usesExternalRequirementsLanguage
+      ? sanitizeImpactAssessmentForExternalRequirements(impactAssessment)
+      : impactAssessment
   const protocolGuardrailNeedsAttention = protocolGuardrailAssessment.checks.some((check) => check.status !== "aligned")
   const objectiveSuggestionReady = objectiveSuggestionMissing.length === 0
   const endpointSuggestionReady = endpointSuggestionMissing.length === 0
   const populationDraftReady = populationDraftMissing.length === 0
   const eligibilitySuggestionReady = eligibilitySuggestionMissing.length === 0
   const impactAssessmentReady = impactAssessmentMissing.length === 0
-  const impactAssessmentButtonLabel =
+  const combinedAnalysisButtonLabel =
     loadingAction === "impact"
-      ? "Assessing..."
-      : !impactAssessmentReady
-        ? `Add ${impactAssessmentMissing.slice(0, 2).join(" + ")}${impactAssessmentMissing.length > 2 ? "..." : ""}`
-        : impactAssessment.generatedAt
-          ? "Refresh impact view"
-          : "Assess study impact"
+      ? "Analyzing..."
+      : impactAssessment.generatedAt
+        ? "View analysis"
+        : impactAssessmentReady
+          ? "Run analysis"
+          : "Review design complexity"
   const sampleSizeEstimateReady = sampleSizeEstimateMissing.length === 0
   const hasObjectiveSuggestionDraft = Boolean(
     objectiveSuggestionDraft.primaryObjective ||
@@ -9819,6 +13669,7 @@ export default function StudySynopsisStudio() {
     sampleSizeEstimate,
     schedule,
     scheduleInsights,
+    evidenceNavigator,
     sections,
     stats,
     study,
@@ -9861,6 +13712,7 @@ export default function StudySynopsisStudio() {
     clearImpactAssessment()
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -9876,6 +13728,7 @@ export default function StudySynopsisStudio() {
     clearSampleSizeEstimate()
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -9890,6 +13743,7 @@ export default function StudySynopsisStudio() {
     clearSampleSizeEstimate()
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -9904,6 +13758,7 @@ export default function StudySynopsisStudio() {
     clearSampleSizeEstimate()
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -9931,6 +13786,7 @@ export default function StudySynopsisStudio() {
     clearSampleSizeEstimate()
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     setApiNotice("Draft statistical assumptions were applied. Review the unified assumptions box, adjust if needed, then rerun the estimate.")
     setReviews((current) => ({
       ...current,
@@ -9944,6 +13800,7 @@ export default function StudySynopsisStudio() {
     setLiterature((current) => ({ ...current, [key]: value, sourceFingerprint: studySchemaFingerprint }))
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -10043,7 +13900,8 @@ export default function StudySynopsisStudio() {
   }
 
   const updateScheduleMeta = <K extends keyof ScheduleForm>(key: K, value: ScheduleForm[K]) => {
-    const editingContent = key !== "iterationPrompt" && key !== "tableLayout"
+    const editingContent = key !== "iterationPrompt" && key !== "tableLayout" && key !== "notesMode"
+    const preserveAnalyses = key === "notesMode"
 
     setSchedule((current) => {
       return {
@@ -10059,8 +13917,11 @@ export default function StudySynopsisStudio() {
       }
     })
     setFinalSections([])
-    clearScheduleInsights()
-    if (key !== "iterationPrompt" && key !== "tableLayout") {
+    if (!preserveAnalyses) {
+      clearScheduleInsights()
+      clearEvidenceNavigator()
+    }
+    if (key !== "iterationPrompt" && key !== "tableLayout" && key !== "notesMode") {
       clearScheduleLayoutRecommendation()
     }
     setApiNotice("")
@@ -10082,6 +13943,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
@@ -10107,6 +13969,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
@@ -10125,6 +13988,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
@@ -10143,6 +14007,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
@@ -10202,6 +14067,7 @@ export default function StudySynopsisStudio() {
     setScheduleColumnDraft(emptyScheduleColumnDraft)
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     clearScheduleLayoutRecommendation()
     setApiNotice("")
     setReviews((current) => ({
@@ -10225,6 +14091,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -10252,6 +14119,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -10269,6 +14137,7 @@ export default function StudySynopsisStudio() {
     }))
     setFinalSections([])
     clearScheduleInsights()
+    clearEvidenceNavigator()
     setApiNotice("")
     setReviews((current) => ({
       ...current,
@@ -10876,6 +14745,68 @@ export default function StudySynopsisStudio() {
     }))
   }
 
+  const handlePrimaryDecisionChange = (value: string) => {
+    const decisionValue = isPrimaryDecisionValue(value) ? value : ""
+    const option = getPrimaryDecisionOption(decisionValue)
+
+    setStudy((current) => ({
+      ...current,
+      primaryDecisionEnabled: decisionValue,
+      secondaryDecisionsEnabled: (current.secondaryDecisionsEnabled || []).filter((item) => item !== decisionValue),
+      decisionStatement: current.primaryDecisionEnabled === decisionValue ? current.decisionStatement : "",
+      customDecisionEnabled: decisionValue === "other" ? current.customDecisionEnabled : "",
+      primaryStudyAim: option?.legacyAim || "",
+      primaryStrategicObjective: option?.strategic || "",
+      primaryEvidenceUseIntent: option?.evidence || "",
+    }))
+    clearAiProposalDrafts()
+    clearSampleSizeEstimate()
+    clearImpactAssessment()
+    setFinalSections([])
+    setApiNotice("")
+    setReviews((current) => ({
+      ...current,
+      study: { ...current.study, status: "pending", reviewedAt: "" },
+      pico: { ...current.pico, status: "pending", reviewedAt: "" },
+      literature: { ...current.literature, status: "pending", reviewedAt: "" },
+      schedule: { ...current.schedule, status: "pending", reviewedAt: "" },
+    }))
+  }
+
+  const toggleSecondaryDecision = (value: PrimaryDecisionValue) => {
+    setStudy((current) => {
+      const existing = current.secondaryDecisionsEnabled || []
+      const nextValues = existing.includes(value)
+        ? existing.filter((item) => item !== value)
+        : existing.length < 3
+          ? [...existing, value]
+          : existing
+
+      return { ...current, secondaryDecisionsEnabled: nextValues }
+    })
+    clearAiProposalDrafts()
+    clearSampleSizeEstimate()
+    clearImpactAssessment()
+    setFinalSections([])
+    setApiNotice("")
+    setReviews((current) => ({
+      ...current,
+      study: { ...current.study, status: "pending", reviewedAt: "" },
+      pico: { ...current.pico, status: "pending", reviewedAt: "" },
+      literature: { ...current.literature, status: "pending", reviewedAt: "" },
+      schedule: { ...current.schedule, status: "pending", reviewedAt: "" },
+    }))
+  }
+
+  const toggleEvidenceDissemination = (value: string) => {
+    setStudy((current) => ({
+      ...current,
+      evidenceDissemination: toggleSelectionItem(current.evidenceDissemination || [], value),
+    }))
+    clearImpactAssessment()
+    setApiNotice("")
+  }
+
   const handleDiseaseSelection = (value: string) => {
     if (value === "__custom__") {
       setIsCustomDisease(true)
@@ -11141,11 +15072,13 @@ export default function StudySynopsisStudio() {
     setApiNotice("")
   }
 
-  const handleAssessImpact = async () => {
-    if (impactAssessmentMissing.length) {
-      setApiError(`Add ${impactAssessmentMissing.join(", ")} before asking AI to assess likely study impact.`)
-      return
+  const handleRunDesignComplexityAndImpact = async (openModal = true) => {
+    setProtocolGuardrailAnalysisUpdatedAt(new Date().toISOString())
+    if (openModal) {
+      setOpenProtocolGuardrailModal(true)
     }
+
+    if (impactAssessmentMissing.length) return
 
     setLoadingAction("impact")
 
@@ -11156,10 +15089,8 @@ export default function StudySynopsisStudio() {
       })
 
       setImpactAssessment(normalizeImpactAssessment({ ...result, generatedAt: result.generatedAt || new Date().toISOString() }))
-      setOpenImpactAssessmentModal(true)
     } catch (error) {
       setImpactAssessment(buildImpactAssessmentFromStudy(study))
-      setOpenImpactAssessmentModal(true)
       setApiNotice(
         `OpenAI impact assessment failed, so the app used a local evidence-impact view instead. Treat it as directional only. ${
           error instanceof Error ? error.message : "Unable to assess current study impact."
@@ -11532,6 +15463,7 @@ export default function StudySynopsisStudio() {
         }),
       )
       clearScheduleInsights()
+      clearEvidenceNavigator()
       setReviews((current) => ({
         ...current,
         schedule: { ...current.schedule, status: "pending", reviewedAt: "" },
@@ -11550,6 +15482,7 @@ export default function StudySynopsisStudio() {
         }),
       )
       clearScheduleInsights()
+      clearEvidenceNavigator()
       setReviews((current) => ({
         ...current,
         schedule: { ...current.schedule, status: "pending", reviewedAt: "" },
@@ -11647,6 +15580,73 @@ export default function StudySynopsisStudio() {
       setRunningScheduleInsightMode(null)
       setLoadingAction(null)
     }
+  }
+
+  const handleGenerateEvidenceNavigator = async () => {
+    if (!showScheduleTab) {
+      setApiError(getScheduleEligibilityLabel(study))
+      return
+    }
+
+    if (!scheduleReady) {
+      setApiError(`Complete Schedule of Activities first: ${scheduleBlocking.join(", ")}.`)
+      return
+    }
+
+    const derivedPico = pico.population || pico.intervention || pico.outcomes ? pico : buildPicoFromStudy(study)
+    const derivedStats = stats.endpointType ? stats : buildStatsFromStudy(study, derivedPico)
+    const derivedLiterature = workflowOptions.useLiterature
+      ? literature.pubmedQuery
+        ? literature
+        : buildLiteratureFromState(study, derivedPico)
+      : buildSkippedLiteraturePlan(study, derivedPico)
+
+    setLoadingAction("evidence_map")
+
+    try {
+      const result = await callOpenAI<Omit<EvidenceNavigator, "generatedAt" | "provenance">>({
+        action: "generate_evidence_map",
+        study,
+        pico: derivedPico,
+        stats: derivedStats,
+        literature: derivedLiterature,
+        schedule,
+      })
+
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
+      setLiterature({ ...derivedLiterature, sourceFingerprint: studySchemaFingerprint })
+      setEvidenceNavigator(
+        normalizeEvidenceNavigator({
+          ...result,
+          generatedAt: new Date().toISOString(),
+          provenance: "ai_generated",
+        }),
+      )
+      setOpenEvidenceNavigatorModal(true)
+    } catch (error) {
+      setPico({ ...derivedPico, sourceFingerprint: studySchemaFingerprint })
+      setStats({ ...derivedStats, sourceFingerprint: studySchemaFingerprint })
+      setLiterature({ ...derivedLiterature, sourceFingerprint: studySchemaFingerprint })
+      setEvidenceNavigator(buildEvidenceNavigatorFromState(study, derivedPico, derivedStats, schedule))
+      setOpenEvidenceNavigatorModal(true)
+      setApiNotice(
+        `OpenAI Data-to-Evidence Navigator failed, so the app used a local evidence map instead. Treat it as directional only. ${
+          error instanceof Error ? error.message : "Unable to generate the evidence map."
+        }`,
+      )
+    } finally {
+      setLoadingAction(null)
+    }
+  }
+
+  const handleOpenEvidenceNavigator = () => {
+    if (evidenceNavigatorReady) {
+      setOpenEvidenceNavigatorModal(true)
+      return
+    }
+
+    handleGenerateEvidenceNavigator()
   }
 
   const handleRefreshSections = async () => {
@@ -11935,6 +15935,64 @@ export default function StudySynopsisStudio() {
     window.URL.revokeObjectURL(url)
   }
 
+  const handleExportEvidenceNavigatorHtml = () => {
+    if (!evidenceNavigatorReady) {
+      setApiError("Generate the Data-to-Evidence Navigator before exporting it.")
+      return
+    }
+
+    const html = evidenceNavigatorToHtml(evidenceNavigator, study)
+    const blob = new Blob(["\ufeff", html], { type: "text/html;charset=utf-8" })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${slugify(study.studyTitle || "study")}-data-to-evidence-navigator.html`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleExportProtocolGuardrailsHtml = () => {
+    const html = protocolGuardrailAssessmentToHtml(protocolGuardrailAssessment, displayedImpactAssessment, study)
+    const blob = new Blob(["\ufeff", html], { type: "text/html;charset=utf-8" })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${slugify(study.studyTitle || "study")}-design-complexity-impact-analysis.html`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleRunProtocolGuardrails = (openModal = true) => {
+    if (impactAssessment.generatedAt || !impactAssessmentReady) {
+      setProtocolGuardrailAnalysisUpdatedAt((current) => current || new Date().toISOString())
+      setOpenProtocolGuardrailModal(true)
+      return
+    }
+
+    void handleRunDesignComplexityAndImpact(openModal)
+  }
+
+  const getAvailableProtocolGuardrailDestinations = (check: ProtocolGuardrailCheck) =>
+    (check.destinations || []).filter((destination) => destination.tab !== "schedule" || showScheduleTab)
+
+  const getAvailableProtocolGuardrailItemDestinations = (item: ProtocolGuardrailReconciliationItem) =>
+    item.destinations.filter((destination) => destination.tab !== "schedule" || showScheduleTab)
+
+  const handleProtocolGuardrailDestination = (destination: ProtocolGuardrailDestination) => {
+    setOpenProtocolGuardrailModal(false)
+    setActiveTab(destination.tab)
+
+    window.setTimeout(() => {
+      const target = document.getElementById(destination.sectionId)
+      target?.scrollIntoView({ behavior: "smooth", block: "start" })
+      target?.focus({ preventScroll: true })
+    }, 150)
+  }
+
   const diseaseOptions = study.therapeuticArea
     ? Object.keys(
         (THERAPEUTIC_LIBRARY[study.therapeuticArea as keyof typeof THERAPEUTIC_LIBRARY]?.diseases ??
@@ -11952,7 +16010,7 @@ export default function StudySynopsisStudio() {
         )?.[study.disease] ?? []
       : []
 
-  const primaryStudyAimSelection = inferPrimaryStudyAim(study)
+  const primaryDecisionSelection = study.primaryDecisionEnabled
   const diseaseSelection = isCustomDisease ? "__custom__" : study.disease
   const studyCategoryLabel =
     STUDY_CATEGORIES[study.category as keyof typeof STUDY_CATEGORIES]?.label || study.category || "Study"
@@ -12422,49 +16480,140 @@ export default function StudySynopsisStudio() {
                 ) : null}
               </div>
 
-              <div className="mt-6 rounded-[26px] border border-amber-200 bg-amber-50 p-5">
+              <div
+                id="study-decision-framing"
+                tabIndex={-1}
+                className="mt-6 scroll-mt-6 rounded-[26px] border border-amber-200 bg-amber-50 p-5 outline-none focus:ring-4 focus:ring-sky-200"
+              >
                 <div className="flex flex-wrap items-start gap-4">
                   <div>
                     <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-800">
-                      Strategic framing
-                      <InfoTooltip content="Start with one high-level answer to what this study is mainly trying to achieve, then narrow to therapeutic area and disease. The disease can seed endpoint options, but users can still add custom disease labels and endpoints." />
+                      Decision framing
+                      <InfoTooltip content="Start with the primary clinical or evidence decision the study must enable. This decision determines what is design-critical; publication and congress use are captured separately as dissemination outputs." />
                     </p>
-                    <h3 className="mt-2 text-xl font-semibold text-amber-950">Primary study aim, therapeutic area, disease, and endpoints</h3>
+                    <h3 className="mt-2 text-xl font-semibold text-amber-950">Decision enabled, therapeutic area, disease, and endpoints</h3>
                   </div>
                 </div>
 
-                <div className="mt-5">
+                <div className="mt-5 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-700">What is this study mainly trying to achieve?</span>
+                    <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                      Primary decision this study must enable
+                      <InfoTooltip content="Choose the decision that sets the minimum evidence standard and core design. Supporting decisions may reuse the same evidence, but should not automatically add endpoints or assessments." />
+                    </span>
                     <select
-                      value={primaryStudyAimSelection}
-                      onChange={(event) => handlePrimaryStudyAimChange(event.target.value)}
+                      value={primaryDecisionSelection}
+                      onChange={(event) => handlePrimaryDecisionChange(event.target.value)}
                       className="w-full rounded-2xl border border-white/60 bg-white/90 px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                     >
-                      <option value="">Select primary study aim</option>
-                      {PRIMARY_STUDY_AIMS.map((option) => (
-                        <option key={option.label} value={option.label}>
+                      <option value="">Select primary decision</option>
+                      {PRIMARY_DECISION_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
                       ))}
                     </select>
+                    {getPrimaryDecisionOption(primaryDecisionSelection)?.description ? (
+                      <span className="block text-xs leading-5 text-slate-600">
+                        {getPrimaryDecisionOption(primaryDecisionSelection)?.description}
+                      </span>
+                    ) : null}
                   </label>
+
+                  <div className="min-w-0 rounded-2xl border border-amber-200 bg-white/80 p-4">
+                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
+                      Decision interpretation
+                      <InfoTooltip content="The app derives this action from the selected decision and current intervention, indication, comparator, and endpoint inputs. It updates automatically as the design changes." />
+                    </p>
+                    <p className="mt-2 break-words text-sm font-semibold leading-6 text-slate-900">
+                      {getDecisionStatement(study) || "Select a primary decision to generate the working interpretation."}
+                    </p>
+                    {primaryDecisionSelection ? (
+                      <details className="mt-3 border-t border-amber-100 pt-3">
+                        <summary className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-amber-900">
+                          <Pencil className="h-3.5 w-3.5" />
+                          {study.decisionStatement ? "Edit interpretation override" : "Override interpretation"}
+                        </summary>
+                        <div className="mt-3">
+                          <TextAreaField
+                            label="Optional interpretation override"
+                            value={study.decisionStatement}
+                            onChange={(value) => updateStudy("decisionStatement", value)}
+                            placeholder={getDerivedDecisionInterpretation(study)}
+                            rows={3}
+                            description="Use only when the generated interpretation is materially inaccurate. Clear this field to return to the automatic interpretation."
+                          />
+                        </div>
+                      </details>
+                    ) : null}
+                  </div>
                 </div>
 
-                {(getStrategicObjectiveLabel(study) || getPrimaryEvidenceUseIntent(study)) && (
+                {primaryDecisionSelection === "other" ? (
+                  <div className="mt-4">
+                    <Field
+                      label="Custom decision category"
+                      value={study.customDecisionEnabled}
+                      onChange={(value) => updateStudy("customDecisionEnabled", value)}
+                      placeholder="For example: Site-of-care decision"
+                    />
+                  </div>
+                ) : null}
+
+                <div className="mt-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-700">Secondary decisions enabled</p>
+                    <p className="text-xs text-slate-500">Optional · select up to 3</p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {PRIMARY_DECISION_OPTIONS.filter(
+                      (option) => option.value !== "other" && option.value !== primaryDecisionSelection,
+                    ).map((option) => {
+                      const selected = study.secondaryDecisionsEnabled.includes(option.value)
+                      const limitReached = !selected && study.secondaryDecisionsEnabled.length >= 3
+
+                      return (
+                        <label
+                          key={option.value}
+                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium ${
+                            limitReached
+                              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                              : selected
+                                ? "cursor-pointer border-amber-300 bg-white text-amber-950"
+                                : "cursor-pointer border-amber-200 bg-amber-100/70 text-amber-900"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            disabled={limitReached}
+                            onChange={() => toggleSecondaryDecision(option.value)}
+                            className="h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          {option.label}
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">
+                    Secondary decisions are tested against existing primary data first. The assessment recommends an addition only when it is both necessary and decision-important.
+                  </p>
+                </div>
+
+                {(getPrimaryDecisionLabel(study) || getSecondaryDecisionLabels(study).length) && (
                   <div className="mt-5 rounded-[24px] border border-slate-200 bg-white/80 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">How the app interprets this choice</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {getStrategicObjectiveLabel(study) ? (
+                      {getPrimaryDecisionLabel(study) ? (
                         <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
-                          Program goal: {getStrategicObjectiveLabel(study)}
+                          Primary decision: {getPrimaryDecisionLabel(study)}
                         </span>
                       ) : null}
-                      {getPrimaryEvidenceUseIntent(study) ? (
-                        <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-900">
-                          Intended evidence use: {getPrimaryEvidenceUseIntent(study)}
+                      {getSecondaryDecisionLabels(study).map((decision) => (
+                        <span key={decision} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-900">
+                          Secondary: {decision}
                         </span>
-                      ) : null}
+                      ))}
                     </div>
                   </div>
                 )}
@@ -12473,36 +16622,49 @@ export default function StudySynopsisStudio() {
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Protocol guardrails
-                        <InfoTooltip content="Advisory checks for objective count, endpoint focus, duration, comparator discipline, and data-collection burden. They do not block the workflow." />
+                        Design complexity and impact analysis
+                        <InfoTooltip content="Reconciles objectives, endpoints, design, data collection, and timing before assessing the likely evidence impact of the study concept." />
                       </p>
                       <h4 className="mt-2 text-base font-semibold text-slate-950">
                         {resolvedProtocolGuardrailProfile === "none"
-                          ? "No additional protocol discipline active"
-                          : PROTOCOL_GUARDRAIL_LABELS[resolvedProtocolGuardrailProfile]}
+                          ? "General design reconciliation"
+                          : resolvedProtocolGuardrailApplicability === "applies"
+                            ? PROTOCOL_GUARDRAIL_LABELS[resolvedProtocolGuardrailProfile]
+                            : resolvedProtocolGuardrailApplicability === "external_requirements"
+                              ? "External requirements and design complexity review"
+                              : "General design complexity review"}
                       </h4>
                       {study.protocolGuardrailProfile === "auto" && suggestedProtocolGuardrailProfile !== "none" ? (
                         <p className="mt-2 text-xs font-semibold text-[#1864AB]">
-                          Auto-suggested from the current study type and primary aim: {PROTOCOL_GUARDRAIL_LABELS[suggestedProtocolGuardrailProfile]}.
+                          {usesExternalRequirementsLanguage
+                            ? "Assessment mode selected from the current study type, stage, decision, and evidence role: External requirements and design complexity review."
+                            : `Auto-suggested from the current study type, stage, decision, and evidence role: ${PROTOCOL_GUARDRAIL_LABELS[suggestedProtocolGuardrailProfile]}.`}
                         </p>
                       ) : null}
                     </div>
                     <button
-                      onClick={() => setOpenProtocolGuardrailModal(true)}
+                      onClick={() => handleRunProtocolGuardrails(true)}
+                      disabled={loadingAction !== null}
                       className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                         protocolGuardrailNeedsAttention
                           ? "border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
                           : "border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                      }`}
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
                     >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Check guardrails
+                      <BarChart3 className="h-4 w-4" />
+                      {combinedAnalysisButtonLabel}
                     </button>
                   </div>
 
-                  <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+                  <p className="mt-3 text-xs leading-5 text-slate-600">
+                    Review design focus first, then assess whether the resulting evidence can influence clinical practice, guidelines, HTA, publication impact, or regulatory decisions.
+                  </p>
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
                     <label className="space-y-2">
-                      <span className="text-sm font-medium text-slate-700">Guardrail profile</span>
+                      <span className="text-sm font-medium text-slate-700">
+                        {usesExternalRequirementsLanguage ? "Assessment mode" : "Guardrail profile"}
+                      </span>
                       <select
                         value={study.protocolGuardrailProfile}
                         onChange={(event) =>
@@ -12512,27 +16674,39 @@ export default function StudySynopsisStudio() {
                       >
                         {PROTOCOL_GUARDRAIL_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
-                            {option.label}
+                            {usesExternalRequirementsLanguage && option.value === "ped_streamlined"
+                              ? "External requirements and design complexity"
+                              : option.label}
                           </option>
                         ))}
                       </select>
                     </label>
 
-                    {resolvedProtocolGuardrailProfile === "practice_informing_ped" ? (
+                    {resolvedProtocolGuardrailProfile === "ped_streamlined" ? (
                       <label className="space-y-2">
-                        <span className="text-sm font-medium text-slate-700">Phase 3 safety data available?</span>
+                        <span className="text-sm font-medium text-slate-700">Study submission / evidence role</span>
                         <select
-                          value={study.phase3SafetyDataAvailable}
+                          value={getResolvedStudyEvidenceRole(study)}
+                          disabled={studyEvidenceRoleLocked}
                           onChange={(event) =>
-                            updateStudy("phase3SafetyDataAvailable", event.target.value as Phase3SafetyAvailability)
+                            updateStudy("studyEvidenceRole", event.target.value as StudyEvidenceRole)
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1864AB] focus:ring-2 focus:ring-sky-100"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-[#1864AB] focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                         >
-                          <option value="">Not confirmed</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                          <option value="unknown">Unknown</option>
+                          {STUDY_EVIDENCE_ROLE_OPTIONS.map((option) => (
+                            <option key={option.value || "unconfirmed"} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
                         </select>
+                        <p className="text-xs leading-5 text-slate-500">
+                          {STUDY_EVIDENCE_ROLE_OPTIONS.find(
+                            (option) => option.value === getResolvedStudyEvidenceRole(study),
+                          )?.description}
+                          {studyEvidenceRoleLocked
+                            ? " This role is set by the selected primary or secondary decision."
+                            : ""}
+                        </p>
                       </label>
                     ) : (
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -12540,69 +16714,51 @@ export default function StudySynopsisStudio() {
                         <p className="mt-2 text-sm leading-6 text-slate-600">
                           {resolvedProtocolGuardrailProfile === "none"
                             ? "AI uses standard study-synopsis drafting rules."
-                            : "AI will favor lean objectives, focused endpoints, and minimized data collection."}
+                            : "AI will apply PED focus and burden signals using the selected evidence-role safeguards."}
                         </p>
                       </div>
                     )}
                   </div>
+
+                  {resolvedProtocolGuardrailApplicability === "external_requirements" ? (
+                    <label className="mt-4 block space-y-2">
+                      <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                        External requirements or authority feedback
+                        <InfoTooltip content="Optional. Record endpoint, follow-up, safety, population, geography, or analysis requirements communicated by a regulator, HTA body, payer, or another authority. Include the source when known." />
+                      </span>
+                      <textarea
+                        value={study.externalRequirements}
+                        onChange={(event) => updateStudy("externalRequirements", event.target.value)}
+                        placeholder="Example: FDA Type C meeting feedback requested OS follow-up and prespecified ORR analysis. NICE advice requested utility and resource-use data."
+                        className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm outline-none transition focus:border-[#1864AB] focus:ring-2 focus:ring-sky-100"
+                      />
+                      <p className="text-xs leading-5 text-slate-500">
+                        Leave blank when requirements are unavailable. The analysis will still check scientific alignment, overlap, multiplicity, timing, cost, and operational burden.
+                      </p>
+                    </label>
+                  ) : null}
+
+                  {resolvedProtocolGuardrailProfile === "ped_streamlined" ? (
+                    <div
+                      className={`mt-3 border px-4 py-3 ${
+                        resolvedProtocolGuardrailApplicability === "applies"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                          : "border-amber-200 bg-amber-50 text-amber-950"
+                      }`}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em]">
+                        {getProtocolGuardrailApplicabilityLabel(resolvedProtocolGuardrailApplicability)}
+                      </p>
+                      <p className="mt-1 text-xs leading-5">
+                        {resolvedProtocolGuardrailApplicability === "applies"
+                          ? "Retain, Simplify, Remove, and Clarify / align recommendations are available."
+                          : resolvedProtocolGuardrailApplicability === "external_requirements"
+                            ? "Checks design coherence independently and shows external requirement evidence separately."
+                            : "Uses descriptive purpose, alignment, overlap, and burden checks. PED numerical limits are not applied while the evidence role is unconfirmed."}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
-
-                <details className="mt-5 rounded-[24px] border border-slate-200 bg-white/70 p-5">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                    <span className="inline-flex items-center gap-2">
-                      Optional refinements
-                      <InfoTooltip content="Use this only if the study has meaningful secondary goals or additional evidence destinations beyond the primary aim." />
-                    </span>
-                  </summary>
-
-                  <div className="mt-4">
-                    <p className="text-sm font-medium text-slate-700">Secondary program goals</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {STRATEGIC_OBJECTIVES.filter((option) => option !== getStrategicObjectiveLabel(study)).map((option) => (
-                        <label
-                          key={option}
-                          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium ${
-                            selectedStrategicObjectives.includes(option)
-                              ? "border-amber-300 bg-white text-amber-950"
-                              : "border-amber-200 bg-amber-100/70 text-amber-900"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedStrategicObjectives.includes(option)}
-                            onChange={() => toggleStudyArrayField("secondaryStrategicObjectives", option)}
-                            className="h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-                          />
-                          {option}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <p className="text-sm font-medium text-slate-700">Secondary evidence uses</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {EVIDENCE_USE_INTENTS.filter((option) => option !== getPrimaryEvidenceUseIntent(study)).map((option) => (
-                        <label
-                          key={option}
-                          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium ${
-                            selectedEvidenceUseIntents.includes(option)
-                              ? "border-sky-300 bg-white text-[#12436B]"
-                              : "border-sky-200 bg-sky-100/60 text-[#12436B]"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedEvidenceUseIntents.includes(option)}
-                            onChange={() => toggleStudyArrayField("secondaryEvidenceUseIntents", option)}
-                            className="h-4 w-4 rounded border-sky-300 text-[#1864AB] focus:ring-sky-500"
-                          />
-                          {option}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </details>
 
                 <div className="mt-5 grid gap-5 md:grid-cols-2">
                   <label className="space-y-2">
@@ -12691,11 +16847,15 @@ export default function StudySynopsisStudio() {
 
               </div>
 
-              <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+              <div
+                id="study-objectives"
+                tabIndex={-1}
+                className="mt-5 scroll-mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-5 outline-none focus:ring-4 focus:ring-sky-200"
+              >
                 <div className="mb-5">
                   <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                     Research objective
-                    <InfoTooltip content="This is where the program and evidence intent turn into the actual scientific question, design framing, and endpoint-facing study narrative. Use the AI actions directly on the fields that need help rather than working through a separate proposal block." />
+                    <InfoTooltip content="This is where the selected primary decision becomes a testable scientific question, design framing, and endpoint-facing study narrative. Use the AI actions directly on the fields that need help rather than adding a separate strategy layer." />
                   </p>
                   <h3 className="mt-2 text-lg font-semibold text-slate-950">What the study will actually test</h3>
                 </div>
@@ -12799,7 +16959,11 @@ export default function StudySynopsisStudio() {
 
               </div>
 
-              <div className="mt-5 grid gap-5 md:grid-cols-2">
+              <div
+                id="study-population"
+                tabIndex={-1}
+                className="mt-5 grid scroll-mt-6 gap-5 rounded-[20px] outline-none focus:ring-4 focus:ring-sky-200 md:grid-cols-2"
+              >
                 <TextAreaField
                   label="Population"
                   value={study.population}
@@ -12888,58 +17052,62 @@ export default function StudySynopsisStudio() {
                   placeholder="XYZ 200 mg IV every 3 weeks until progression or unacceptable toxicity."
                   rows={3}
                 />
-                <TextAreaField
-                  label="Comparator"
-                  value={study.comparator || study.topComparator}
-                  onChange={(value) => updateStudy("comparator", value)}
-                  placeholder="Investigator's choice of docetaxel or pemetrexed standard of care."
-                  rows={3}
-                />
-                <TextAreaField
-                  label="Endpoints and assessments"
-                  value={study.outcomes}
-                  onChange={(value) => updateStudy("outcomes", value)}
-                  placeholder="Progression-free survival, overall survival, ORR, safety, and quality of life."
-                  collapsibleInput
-                  collapsibleInputLabel="Edit endpoints as text"
-                  description={
-                    endpointSuggestionReady
-                      ? "AI can propose focused primary, secondary, and exploratory endpoint packages from the current objective."
-                      : `To enable AI here, add: ${endpointSuggestionMissing.join(", ")}.`
-                  }
-                  actions={
-                    <button
-                      onClick={handleSuggestEndpoints}
-                      disabled={loadingAction !== null || !endpointSuggestionReady}
-                      title={!endpointSuggestionReady ? `Add ${endpointSuggestionMissing.join(", ")}` : undefined}
-                      className="inline-flex items-center gap-2 rounded-full bg-[#1864AB] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#155799] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-700 disabled:opacity-100"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      {endpointSuggestionButtonLabel}
-                    </button>
-                  }
-                  footer={
-                    <StructuredItemEditor
-                      title="Structured endpoint items"
-                      description="Review the endpoint package as distinct items. Uncheck to drop an item from the study wording, edit any text inline, or delete it entirely."
-                      items={outcomeEditorItems}
-                      emptyText="Add endpoint wording above, or add a structured item here to start building the endpoint package."
-                      draftValue={outcomeItemDraft}
-                      onDraftChange={setOutcomeItemDraft}
-                      onAdd={() =>
-                        addStructuredStudyFieldItem("outcomes", outcomeEditorItems, outcomeItemDraft, setOutcomeEditorItems, () =>
-                          setOutcomeItemDraft(""),
-                        )
-                      }
-                      onToggle={(id) => toggleStructuredStudyFieldItem("outcomes", outcomeEditorItems, id, setOutcomeEditorItems)}
-                      onItemChange={(id, value) =>
-                        updateStructuredStudyFieldItemText("outcomes", outcomeEditorItems, id, value, setOutcomeEditorItems)
-                      }
-                      onDelete={(id) => deleteStructuredStudyFieldItem("outcomes", outcomeEditorItems, id, setOutcomeEditorItems)}
-                      addPlaceholder="Add another endpoint or assessment item"
-                    />
-                  }
-                />
+                <div id="study-comparator" tabIndex={-1} className="scroll-mt-6 rounded-[20px] outline-none focus:ring-4 focus:ring-sky-200">
+                  <TextAreaField
+                    label="Comparator"
+                    value={study.comparator || study.topComparator}
+                    onChange={(value) => updateStudy("comparator", value)}
+                    placeholder="Investigator's choice of docetaxel or pemetrexed standard of care."
+                    rows={3}
+                  />
+                </div>
+                <div id="study-endpoints" tabIndex={-1} className="scroll-mt-6 rounded-[20px] outline-none focus:ring-4 focus:ring-sky-200">
+                  <TextAreaField
+                    label="Endpoints and assessments"
+                    value={study.outcomes}
+                    onChange={(value) => updateStudy("outcomes", value)}
+                    placeholder="Progression-free survival, overall survival, ORR, safety, and quality of life."
+                    collapsibleInput
+                    collapsibleInputLabel="Edit endpoints as text"
+                    description={
+                      endpointSuggestionReady
+                        ? "AI can propose focused primary, secondary, and exploratory endpoint packages from the current objective."
+                        : `To enable AI here, add: ${endpointSuggestionMissing.join(", ")}.`
+                    }
+                    actions={
+                      <button
+                        onClick={handleSuggestEndpoints}
+                        disabled={loadingAction !== null || !endpointSuggestionReady}
+                        title={!endpointSuggestionReady ? `Add ${endpointSuggestionMissing.join(", ")}` : undefined}
+                        className="inline-flex items-center gap-2 rounded-full bg-[#1864AB] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#155799] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-700 disabled:opacity-100"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        {endpointSuggestionButtonLabel}
+                      </button>
+                    }
+                    footer={
+                      <StructuredItemEditor
+                        title="Structured endpoint items"
+                        description="Review the endpoint package as distinct items. Uncheck to drop an item from the study wording, edit any text inline, or delete it entirely."
+                        items={outcomeEditorItems}
+                        emptyText="Add endpoint wording above, or add a structured item here to start building the endpoint package."
+                        draftValue={outcomeItemDraft}
+                        onDraftChange={setOutcomeItemDraft}
+                        onAdd={() =>
+                          addStructuredStudyFieldItem("outcomes", outcomeEditorItems, outcomeItemDraft, setOutcomeEditorItems, () =>
+                            setOutcomeItemDraft(""),
+                          )
+                        }
+                        onToggle={(id) => toggleStructuredStudyFieldItem("outcomes", outcomeEditorItems, id, setOutcomeEditorItems)}
+                        onItemChange={(id, value) =>
+                          updateStructuredStudyFieldItemText("outcomes", outcomeEditorItems, id, value, setOutcomeEditorItems)
+                        }
+                        onDelete={(id) => deleteStructuredStudyFieldItem("outcomes", outcomeEditorItems, id, setOutcomeEditorItems)}
+                        addPlaceholder="Add another endpoint or assessment item"
+                      />
+                    }
+                  />
+                </div>
                 <TextAreaField
                   label="Operational notes"
                   value={study.operationalNotes}
@@ -12985,7 +17153,11 @@ export default function StudySynopsisStudio() {
                 />
               </div>
 
-              <div className="mt-5 grid gap-5 md:grid-cols-3">
+              <div
+                id="study-timing"
+                tabIndex={-1}
+                className="mt-5 grid scroll-mt-6 gap-5 rounded-[20px] outline-none focus:ring-4 focus:ring-sky-200 md:grid-cols-3"
+              >
                 <Field
                   label={isEvidenceSynthesisStudy ? "Evidence window / timeframe" : "Timeline"}
                   value={study.timeline}
@@ -13019,48 +17191,38 @@ export default function StudySynopsisStudio() {
                 )}
               </div>
 
-              <div className="mt-6 rounded-[26px] border border-slate-200 bg-slate-50 p-5">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                      AI evidence impact
-                      <InfoTooltip content="Use this at the end of Tab 1 to pressure-test the current concept. The assessment estimates whether the study is currently stronger for publication, practice, HTA, guideline, or label-relevant impact." />
-                    </p>
-                    <h3 className="mt-2 text-xl font-semibold text-slate-950">Early view of likely study impact</h3>
-                  </div>
-
-                  <button
-                    onClick={handleAssessImpact}
-                    disabled={loadingAction !== null || !impactAssessmentReady}
-                    title={impactAssessmentReady ? "Assess likely study impact" : `Needs: ${impactAssessmentMissing.join(", ")}`}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#1864AB] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#155799] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                    {impactAssessmentButtonLabel}
-                  </button>
-                </div>
-
-                <p className={`mt-3 text-xs ${impactAssessmentReady ? "text-emerald-700" : "text-slate-500"}`}>
-                  {impactAssessmentReady
-                    ? "Ready to assess. Comparator, endpoints, timeline, geography, and sample size improve the assessment but do not block it."
-                    : `Needs only essential concept inputs: ${impactAssessmentMissing.join(", ")}.`}
+              <details className="mt-5 border-y border-slate-200 py-4">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+                  <span className="inline-flex items-center gap-2">
+                    Planned evidence outputs
+                    <span className="text-xs font-medium text-slate-500">Optional</span>
+                    <InfoTooltip content="Scientific publication is assumed for every study. Select only additional outputs that should shape later drafting or communication; these selections do not justify extra endpoints or data collection." />
+                  </span>
+                </summary>
+                <p className="mt-3 text-xs leading-5 text-slate-500">
+                  Scientific publication is assumed. Select only additional deliverables that should be reflected in later report generation.
                 </p>
-
-                {impactAssessment.generatedAt ? (
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-white bg-white px-4 py-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">Last assessment available</p>
-                      <p className="mt-1 text-xs text-slate-500">{formatTimestamp(impactAssessment.generatedAt)}</p>
-                    </div>
-                    <button
-                      onClick={() => setOpenImpactAssessmentModal(true)}
-                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800"
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {PLANNED_EVIDENCE_OUTPUTS.map((option) => (
+                    <label
+                      key={option}
+                      className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium ${
+                        study.evidenceDissemination.includes(option)
+                          ? "border-sky-300 bg-sky-50 text-[#12436B]"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`}
                     >
-                      View assessment
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+                      <input
+                        type="checkbox"
+                        checked={study.evidenceDissemination.includes(option)}
+                        onChange={() => toggleEvidenceDissemination(option)}
+                        className="h-4 w-4 rounded border-sky-300 text-[#1864AB] focus:ring-sky-500"
+                      />
+                      {option}
+                    </label>
+                  ))}
+                </div>
+              </details>
 
               {showReviewGates && (
                 <div className="mt-6">
@@ -13471,7 +17633,11 @@ export default function StudySynopsisStudio() {
               )}
             </div>
 
-            <div className="rounded-[28px] border border-[#D0EBFF] bg-[#F8FBFF] p-6 shadow-[0_22px_70px_rgba(15,23,42,0.06)]">
+            <div
+              id="pico-statistics"
+              tabIndex={-1}
+              className="scroll-mt-6 rounded-[28px] border border-[#D0EBFF] bg-[#F8FBFF] p-6 outline-none shadow-[0_22px_70px_rgba(15,23,42,0.06)] focus:ring-4 focus:ring-sky-200"
+            >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-[#1864AB]">
@@ -13930,7 +18096,11 @@ export default function StudySynopsisStudio() {
 
         {activeTab === "schedule" && showScheduleTab && (
           <section className="space-y-6">
-            <div className="rounded-[28px] border border-white/60 bg-white/80 p-6 shadow-[0_22px_70px_rgba(15,23,42,0.06)]">
+            <div
+              id="schedule-activities"
+              tabIndex={-1}
+              className="scroll-mt-6 rounded-[28px] border border-white/60 bg-white/80 p-6 outline-none shadow-[0_22px_70px_rgba(15,23,42,0.06)] focus:ring-4 focus:ring-sky-200"
+            >
               <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-700">Tab {tabIndexById.schedule}</p>
@@ -13995,6 +18165,18 @@ export default function StudySynopsisStudio() {
                   >
                     <Scale className="h-4 w-4" />
                     {runningScheduleInsightMode === "tradeoff" ? "Checking trade-offs..." : "Check trade-off analysis"}
+                  </button>
+                  <button
+                    onClick={handleOpenEvidenceNavigator}
+                    disabled={loadingAction !== null || !scheduleReady}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <GitBranch className="h-4 w-4" />
+                    {loadingAction === "evidence_map"
+                      ? "Mapping evidence..."
+                      : evidenceNavigatorReady
+                        ? "View Data-to-Evidence Navigator"
+                        : "Data-to-Evidence Navigator"}
                   </button>
                 </div>
               </div>
@@ -14104,6 +18286,44 @@ export default function StudySynopsisStudio() {
                     ? `Auto is currently using ${scheduleTablePresentation.effectiveLayout === "split" ? "split-table" : "single-table"} view.`
                     : `Manual layout override: ${schedule.tableLayout === "split" ? "split-table" : "single-table"} view.`}
                 </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
+                  <div className="mr-1">
+                    <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Notes column
+                      <InfoTooltip content="This only controls whether the Notes column appears on screen and in exports. Notes already entered remain saved and can be shown again." />
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {schedule.notesMode === "auto"
+                        ? hasScheduleNotes(schedule)
+                          ? "Auto is showing Notes because at least one row has notes."
+                          : "Auto is hiding Notes because all row notes are empty."
+                        : schedule.notesMode === "hide"
+                          ? "Notes are hidden, but the underlying notes data is retained."
+                          : "Notes are always shown, including empty notes cells."}
+                    </p>
+                  </div>
+                  <div className="inline-flex rounded-full border border-slate-200 bg-white p-1">
+                    {[
+                      { value: "auto", label: "Auto hide empty" },
+                      { value: "show", label: "Show notes" },
+                      { value: "hide", label: "Hide notes" },
+                    ].map((option) => {
+                      const selected = schedule.notesMode === option.value
+
+                      return (
+                        <button
+                          key={option.value}
+                          onClick={() => updateScheduleMeta("notesMode", option.value as ScheduleNotesMode)}
+                          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                            selected ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
                 {scheduleLayoutRecommendation.provenance !== "empty" && (
                   <button
                     onClick={() => setOpenScheduleLayoutRecommendationModal(true)}
@@ -14128,6 +18348,7 @@ export default function StudySynopsisStudio() {
                     <ScheduleTable
                       schedule={table.schedule}
                       editable
+                      evidenceBadges={evidenceBadgeMap}
                       onRowChange={updateScheduleRow}
                       onCellChange={updateScheduleCell}
                       onRemoveRow={handleRemoveScheduleRow}
@@ -14164,6 +18385,21 @@ export default function StudySynopsisStudio() {
                     ? `${scheduleInsights.mode === "tradeoff" ? "Trade-off analysis" : "Complexity assessment"} updated ${formatTimestamp(scheduleInsights.generatedAt)}.`
                     : "No analysis has been run yet. Generate or edit the SoA first, then assess complexity or trade-offs."}
                 </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  {evidenceNavigatorReady && (
+                    <button
+                      onClick={() => setOpenEvidenceNavigatorModal(true)}
+                      className="rounded-full border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-800 transition hover:border-violet-300 hover:bg-violet-50"
+                    >
+                      View Data-to-Evidence Navigator
+                    </button>
+                  )}
+                  <p className="text-xs leading-5 text-slate-500">
+                    {evidenceNavigatorReady
+                      ? `Evidence map updated ${formatTimestamp(evidenceNavigator.generatedAt)}.`
+                      : "Run Data-to-Evidence Navigator to see which analyses and evidence outputs the SoA enables or misses."}
+                  </p>
+                </div>
               </div>
             </div>
           </section>
@@ -14350,41 +18586,322 @@ export default function StudySynopsisStudio() {
 
       <OverlayModal
         open={openProtocolGuardrailModal}
-        eyebrow="Protocol guardrails"
-        title={protocolGuardrailAssessment.label}
-        description={protocolGuardrailAssessment.summary}
+        eyebrow="Study design assessment"
+        title="Design Complexity and Impact Analysis"
+        description="Reconcile the decision, objectives, endpoints, design, data collection, and timing before assessing the likely evidence impact."
         onClose={() => setOpenProtocolGuardrailModal(false)}
+        size="full"
       >
-        <div className="space-y-3">
-          {protocolGuardrailAssessment.checks.map((check) => (
-            <section key={check.id} className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-950">{check.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{check.finding}</p>
-                </div>
-                <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${getProtocolGuardrailStatusTone(check.status)}`}>
-                  {getProtocolGuardrailStatusLabel(check.status)}
-                </span>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-medium text-slate-500">
+            {protocolGuardrailAnalysisUpdatedAt || impactAssessment.generatedAt
+              ? `Last run ${formatTimestamp(protocolGuardrailAnalysisUpdatedAt || impactAssessment.generatedAt)} using the current study and PICO/Stats inputs.`
+              : "Run the analysis to use the current study and PICO/Stats inputs."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => void handleRunDesignComplexityAndImpact(false)}
+              disabled={loadingAction !== null}
+              className="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-900 transition hover:bg-sky-100"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {loadingAction === "impact" ? "Analyzing..." : "Rerun analysis"}
+            </button>
+            <button
+              onClick={handleExportProtocolGuardrailsHtml}
+              disabled={loadingAction !== null}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50"
+            >
+              <FileDown className="h-4 w-4" />
+              Export HTML
+            </button>
+          </div>
+        </div>
+        <section
+          className={`mb-4 border p-4 ${
+            protocolGuardrailAssessment.applicability === "applies"
+              ? "border-emerald-200 bg-emerald-50"
+              : protocolGuardrailAssessment.applicability === "external_requirements"
+                ? "border-amber-200 bg-amber-50"
+                : "border-slate-200 bg-slate-50"
+          }`}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+                {protocolGuardrailAssessment.applicabilityLabel}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-slate-950">
+                Study submission / evidence role: {protocolGuardrailAssessment.evidenceRoleLabel}
+              </p>
+              <p className="mt-1 max-w-5xl text-sm leading-6 text-slate-700">{protocolGuardrailAssessment.summary}</p>
+            </div>
+          </div>
+        </section>
+        <section className="border border-sky-200 bg-sky-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-sky-950">Decision-to-Design Trace</p>
+              <p className="mt-1 text-sm text-sky-800">Start with the decision, then verify the objective, endpoint, and estimand before adding design or data-collection complexity.</p>
+            </div>
+            <span className="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-900">Review in order</span>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {protocolGuardrailAssessment.trace.map((item) => (
+              <div key={item.label} className={`min-w-0 border p-3 ${item.complete ? "border-sky-200 bg-white" : "border-amber-200 bg-amber-50"}`}>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
+                <p className="mt-2 break-words text-sm font-semibold leading-6 text-slate-900">{item.value}</p>
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{check.action}</p>
-            </section>
-          ))}
-        </div>
-        <div className="mt-5 rounded-[20px] border border-sky-200 bg-sky-50 p-4">
-          <p className="text-sm font-semibold text-sky-950">How AI will use this</p>
-          <p className="mt-2 text-sm leading-6 text-sky-900">{buildProtocolGuardrailInstruction(study)}</p>
-        </div>
-      </OverlayModal>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 border border-sky-200 bg-white p-3">
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900">
+              Primary: {protocolGuardrailAssessment.primaryDecisionLabel || "Not defined"}
+            </span>
+            {protocolGuardrailAssessment.secondaryDecisionLabels.map((decision) => (
+              <span key={decision} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900">
+                Secondary: {decision}
+              </span>
+            ))}
+            {protocolGuardrailAssessment.dissemination.map((item) => (
+              <span key={item} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                Output: {item}
+              </span>
+            ))}
+            <p className="basis-full text-xs leading-5 text-slate-600">
+              Outputs do not make endpoints or data collection decision-critical by themselves.
+            </p>
+          </div>
+        </section>
 
-      <OverlayModal
-        open={openImpactAssessmentModal}
-        eyebrow="AI evidence impact"
-        title="Likely study impact"
-        description="Use this as a focused pressure-test of whether the current concept is stronger for publication, practice, HTA, guideline, or label-relevant impact."
-        onClose={() => setOpenImpactAssessmentModal(false)}
-      >
-        <ImpactAssessmentPanel assessment={impactAssessment} />
+        <section className="mt-5 border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Evidence impact outlook</p>
+              <h3 className="mt-2 text-xl font-semibold text-slate-950">Likely impact of the current study design</h3>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+                Use this outlook to prioritize the objectives, endpoints, and design features reviewed below. The primary decision remains the governing constraint.
+              </p>
+            </div>
+            {impactAssessment.generatedAt ? (
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">
+                Saved {formatTimestamp(impactAssessment.generatedAt)}
+              </span>
+            ) : null}
+          </div>
+
+          {loadingAction === "impact" ? (
+            <div className="mt-4 border border-sky-200 bg-sky-50 p-4 text-sm font-semibold text-sky-900">
+              Refreshing the evidence impact assessment using the current study inputs...
+            </div>
+          ) : impactAssessmentMissing.length ? (
+            <div className="mt-4 border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-950">Impact assessment needs essential study context</p>
+              <p className="mt-1 text-sm leading-6 text-amber-900">
+                Add {impactAssessmentMissing.join(", ")} in Tab 1, then rerun this analysis. The design-complexity recommendations below remain available.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <ImpactAssessmentPanel assessment={displayedImpactAssessment} />
+            </div>
+          )}
+        </section>
+
+        <section className="mt-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-950">
+                {protocolGuardrailAssessment.applicability === "applies"
+                  ? "PED review hierarchy"
+                  : protocolGuardrailAssessment.applicability === "external_requirements"
+                    ? "External requirements reconciliation"
+                    : "Design complexity review hierarchy"}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">Resolve upstream decisions before reviewing lower-level operational detail.</p>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 xl:grid-cols-5">
+            {protocolGuardrailAssessment.stages.map((stage) => (
+              <section
+                key={stage.id}
+                className={`border p-3 ${getProtocolGuardrailStatusTone(
+                  stage.status,
+                  protocolGuardrailAssessment.applicability,
+                )}`}
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-70">Step {stage.sequence}</p>
+                <p className="mt-2 text-sm font-semibold leading-5">{stage.label}</p>
+                <p className="mt-2 text-xs leading-5 opacity-90">{stage.description}</p>
+                <span className="mt-3 inline-flex rounded-full border border-current/25 bg-white/70 px-2.5 py-1 text-[11px] font-semibold">
+                  {getProtocolGuardrailStatusLabel(stage.status, protocolGuardrailAssessment.applicability)}
+                </span>
+              </section>
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-950">Element-level reconciliation</p>
+              <p className="mt-1 text-sm text-slate-600">
+                {protocolGuardrailAssessment.applicability === "external_requirements"
+                  ? "Review design contribution separately from external-requirement evidence. Missing authority input does not prevent overlap, multiplicity, timing, cost, or burden checks."
+                  : protocolGuardrailAssessment.applicability === "general_complexity"
+                    ? "Review purpose, alignment, overlap, and burden descriptively while the evidence role remains unconfirmed."
+                    : "Review each protocol element in hierarchy. Clarify alignment before retaining, simplifying, or removing downstream collection."}
+              </p>
+            </div>
+            <div className="flex max-w-4xl flex-col items-end gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
+                {protocolGuardrailAssessment.applicability === "external_requirements" ? (
+                  <span className="self-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Design</span>
+                ) : null}
+                {getProtocolGuardrailLegend(protocolGuardrailAssessment.applicability).map((entry) => (
+                  <span
+                    key={entry.label}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${entry.tone}`}
+                  >
+                    {entry.label}
+                  </span>
+                ))}
+              </div>
+              {protocolGuardrailAssessment.applicability === "external_requirements" ? (
+                <div className="flex flex-wrap justify-end gap-2">
+                  <span className="self-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">External basis</span>
+                  {(["documented", "mentioned", "not_provided"] as ExternalRequirementStatus[]).map((status) => (
+                    <span
+                      key={status}
+                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getExternalRequirementStatusTone(status)}`}
+                    >
+                      {getExternalRequirementStatusLabel(status)}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-3 overflow-hidden border border-slate-300 bg-white">
+            <table className="w-full table-fixed border-collapse text-left">
+              <colgroup>
+                {protocolGuardrailAssessment.applicability === "external_requirements" ? (
+                  <>
+                    <col className="w-[23%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[25%]" />
+                    <col className="w-[8%]" />
+                  </>
+                ) : (
+                  <>
+                    <col className="w-[28%]" />
+                    <col className="w-[19%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[27%]" />
+                    <col className="w-[12%]" />
+                  </>
+                )}
+              </colgroup>
+              <thead>
+                <tr className="bg-slate-900 text-white">
+                  <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em]">Protocol element</th>
+                  <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em]">Role and link</th>
+                  <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em]">
+                    {protocolGuardrailAssessment.applicability === "external_requirements" ? "Design assessment" : "Recommendation"}
+                  </th>
+                  {protocolGuardrailAssessment.applicability === "external_requirements" ? (
+                    <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em]">External basis</th>
+                  ) : null}
+                  <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em]">Rationale</th>
+                  <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em]">Edit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {protocolGuardrailAssessment.reconciliationGroups.map((group) => (
+                  <Fragment key={group.id}>
+                    <tr className="border-t border-sky-200 bg-sky-50">
+                      <td colSpan={protocolGuardrailAssessment.applicability === "external_requirements" ? 6 : 5} className="px-3 py-3">
+                        <p className="text-sm font-semibold text-sky-950">{group.label}</p>
+                        <p className="mt-0.5 text-xs leading-5 text-sky-800">{group.description}</p>
+                      </td>
+                    </tr>
+                    {group.items.map((item, itemIndex) => {
+                      const destinations = getAvailableProtocolGuardrailItemDestinations(item)
+                      const designAssessment = getProtocolGuardrailDesignAssessment(item)
+                      const externalRequirementStatus = getExternalRequirementStatus(
+                        item,
+                        study,
+                        protocolGuardrailAssessment.applicability,
+                      )
+
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`border-t border-slate-200 align-top ${itemIndex % 2 === 0 ? "bg-white" : "bg-slate-50/70"}`}
+                        >
+                          <td className="break-words px-3 py-3 text-sm font-semibold leading-6 text-slate-950">{item.element}</td>
+                          <td className="break-words px-3 py-3">
+                            <p className="text-xs font-semibold text-slate-800">{item.role}</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">{item.linkedTo}</p>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span
+                              className={`inline-flex max-w-full rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                                protocolGuardrailAssessment.applicability === "external_requirements"
+                                  ? getProtocolGuardrailDesignAssessmentTone(designAssessment)
+                                  : getProtocolGuardrailItemRecommendationTone(
+                                      item.recommendation,
+                                      protocolGuardrailAssessment.applicability,
+                                    )
+                              }`}
+                            >
+                              {getProtocolGuardrailItemDisplayLabel(
+                                item,
+                                protocolGuardrailAssessment.applicability,
+                              )}
+                            </span>
+                          </td>
+                          {protocolGuardrailAssessment.applicability === "external_requirements" ? (
+                            <td className="px-3 py-3">
+                              <span
+                                className={`inline-flex max-w-full rounded-full border px-2.5 py-1 text-xs font-semibold ${getExternalRequirementStatusTone(
+                                  externalRequirementStatus,
+                                )}`}
+                              >
+                                {getExternalRequirementStatusLabel(externalRequirementStatus)}
+                              </span>
+                            </td>
+                          ) : null}
+                          <td className="break-words px-3 py-3 text-xs leading-5 text-slate-700">
+                            {getProtocolGuardrailItemRationale(item, protocolGuardrailAssessment.applicability)}
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex flex-col items-start gap-1.5">
+                              {destinations.map((destination) => (
+                                <button
+                                  key={`${item.id}-${destination.sectionId}`}
+                                  onClick={() => handleProtocolGuardrailDestination(destination)}
+                                  className="inline-flex max-w-full items-center gap-1.5 text-left text-xs font-semibold leading-4 text-sky-800 underline decoration-sky-200 underline-offset-4 transition hover:text-sky-950"
+                                >
+                                  <Pencil className="h-3.5 w-3.5 shrink-0" />
+                                  {destination.label}
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
       </OverlayModal>
 
       <OverlayModal
@@ -14399,6 +18916,35 @@ export default function StudySynopsisStudio() {
         onClose={() => setOpenScheduleInsightsModal(false)}
       >
         <ScheduleInsightsPanel insights={scheduleInsights} mode={scheduleInsightsModalMode} />
+      </OverlayModal>
+
+      <OverlayModal
+        open={openEvidenceNavigatorModal}
+        eyebrow="Evidence map"
+        title="Data-to-Evidence Navigator"
+        description="Review what the current SoA data collection enables, what evidence opportunities are missing, and whether burden is justified by future analysis value."
+        onClose={() => setOpenEvidenceNavigatorModal(false)}
+        size="full"
+      >
+        <div className="mb-4 flex flex-wrap justify-end gap-3">
+          <button
+            onClick={handleExportEvidenceNavigatorHtml}
+            disabled={loadingAction !== null || !evidenceNavigatorReady}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <FileDown className="h-4 w-4" />
+            Export HTML
+          </button>
+          <button
+            onClick={handleGenerateEvidenceNavigator}
+            disabled={loadingAction !== null || !scheduleReady}
+            className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Sparkles className="h-4 w-4" />
+            {loadingAction === "evidence_map" ? "Regenerating..." : "Regenerate"}
+          </button>
+        </div>
+        <EvidenceNavigatorPanel navigator={evidenceNavigator} />
       </OverlayModal>
 
       <OverlayModal

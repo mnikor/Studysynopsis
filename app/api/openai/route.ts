@@ -18,7 +18,14 @@ const studySchema = z.object({
   category: stringField,
   subcategory: stringField,
   developmentStage: stringField,
+  primaryDecisionEnabled: stringField,
+  secondaryDecisionsEnabled: stringArrayField,
+  decisionStatement: stringField,
+  customDecisionEnabled: stringField,
+  evidenceDissemination: stringArrayField,
   protocolGuardrailProfile: stringField,
+  studyEvidenceRole: stringField,
+  externalRequirements: stringField,
   phase3SafetyDataAvailable: stringField,
   protocolGuardrailNotes: stringField,
   primaryEvidenceUseIntent: stringField,
@@ -56,7 +63,14 @@ const importedStudySchema = z.object({
   category: requiredStringField,
   subcategory: requiredStringField,
   developmentStage: requiredStringField,
+  primaryDecisionEnabled: requiredStringField,
+  secondaryDecisionsEnabled: requiredStringArrayField,
+  decisionStatement: requiredStringField,
+  customDecisionEnabled: requiredStringField,
+  evidenceDissemination: requiredStringArrayField,
   protocolGuardrailProfile: requiredStringField,
+  studyEvidenceRole: requiredStringField,
+  externalRequirements: requiredStringField,
   phase3SafetyDataAvailable: requiredStringField,
   protocolGuardrailNotes: requiredStringField,
   primaryEvidenceUseIntent: requiredStringField,
@@ -299,6 +313,14 @@ const requestSchema = z.discriminatedUnion("action", [
     schedule: scheduleSchema,
   }),
   z.object({
+    action: z.literal("generate_evidence_map"),
+    study: studySchema,
+    pico: picoSchema.partial().optional(),
+    stats: statsSchema.partial().optional(),
+    literature: literatureSchema.partial().optional(),
+    schedule: scheduleSchema,
+  }),
+  z.object({
     action: z.literal("draft_sections"),
     study: studySchema,
     pico: picoSchema.partial().optional(),
@@ -382,6 +404,63 @@ const scheduleLayoutRecommendationResultSchema = z.object({
   rationale: z.string(),
   benefits: z.array(z.string()),
   cautions: z.array(z.string()),
+})
+
+const evidenceCoverageSchema = z.object({
+  area: z.string(),
+  status: z.enum(["strong", "partial", "weak", "missing"]),
+  rationale: z.string(),
+})
+
+const evidenceMapItemSchema = z.object({
+  id: z.string(),
+  dataDomain: z.string(),
+  soaRows: z.array(z.string()),
+  requiredFor: z.enum(["primary", "secondary", "exploratory", "safety", "heor", "publication"]),
+  objectiveLink: z.string(),
+  endpointOrEstimand: z.string(),
+  clinicalRelevance: z.enum(["direct", "contextual", "hypothesis_generating"]),
+  clinicalRelevanceRationale: z.string(),
+  supportiveEvidenceMessage: z.string(),
+  inconclusiveEvidenceRisk: z.string(),
+  analysisReadiness: z.enum(["decision_ready", "supportive", "hypothesis_generating", "not_ready"]),
+  decisionImportance: z.enum(["high", "moderate", "low"]),
+  decisionUse: z.string(),
+  decisionAudience: z.array(z.string()),
+  dataCaptureSource: z.string(),
+  keyCollectionTimepoints: z.array(z.string()),
+  minimumDataQuality: z.string(),
+  collectionBurden: z.enum(["low", "medium", "high"]),
+  evidenceValue: z.enum(["low", "medium", "high"]),
+  costImplication: z.enum(["low", "medium", "high", "very_high", "depends"]),
+  dataCollectionCost: z.enum(["low", "medium", "high", "very_high", "depends"]),
+  followUpDurationImpact: z.enum(["low", "medium", "high"]),
+  followUpDurationRationale: z.string(),
+  costDrivers: z.array(z.string()),
+  costRationale: z.string(),
+  costValueJudgment: z.enum(["worth_adding", "only_if_strategic_priority", "defer", "avoid_unless_required"]),
+  analysesUnlocked: z.array(z.string()),
+  futureOpportunities: z.array(z.string()),
+  ifMissing: z.string(),
+  recommendation: z.enum(["keep", "add", "simplify", "optional", "remove"]),
+})
+
+const evidenceSimulatorOptionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  currentStatus: z.enum(["included", "partial", "missing"]),
+  collectionBurden: z.enum(["low", "medium", "high"]),
+  evidenceValue: z.enum(["low", "medium", "high"]),
+  analysesUnlocked: z.array(z.string()),
+  tradeoff: z.string(),
+})
+
+const evidenceMapResultSchema = z.object({
+  executiveSummary: z.string(),
+  coverage: z.array(evidenceCoverageSchema),
+  items: z.array(evidenceMapItemSchema),
+  gaps: z.array(z.string()),
+  simulatorOptions: z.array(evidenceSimulatorOptionSchema),
 })
 
 const draftSectionsResultSchema = z.object({
@@ -654,7 +733,8 @@ function extractPicoStatsPrompt() {
   return [
     "You are a senior clinical development strategist and biostatistician drafting a study synopsis.",
     "Use the provided study design data to produce clean, publication-ready PICO elements and draft statistical assumptions.",
-    "Pay close attention to development stage, strategic objective, evidence use intent, therapeutic area, disease, and user-selected endpoints.",
+    "Pay close attention to primaryDecisionEnabled, the derived decision interpretation in decisionStatement, secondaryDecisionsEnabled, development stage, therapeutic area, disease, and user-selected endpoints.",
+    "Treat the primary decision as the minimum evidence standard. Secondary decisions should reuse primary data and justify only narrowly targeted additions. evidenceDissemination describes outputs and must not justify extra endpoints or data collection by itself.",
     "If protocolGuardrailNotes is provided, apply it when deciding objective, endpoint, estimand, sample-size, and data-collection discipline.",
     "Do not add PRO/COA, PK/PD, biomarkers, biospecimens, special imaging, ECG, extra labs, wearables, or remote assessments unless they are tied to objectives, endpoint interpretation, safety, dose, population definition, feasibility, or the declared decision use.",
     "Keep outputs concise but specific. Do not use placeholders like TBD unless the input is truly missing.",
@@ -666,15 +746,17 @@ function extractPicoStatsPrompt() {
 function objectiveSuggestionPrompt() {
   return [
     "You are a senior clinical strategist and medical writer.",
-    "Use the study's development stage, strategic objective, evidence use intent, therapeutic area, disease, intervention, comparator, line of therapy or setting, suggested endpoints, study type, and optional requestNote to propose synopsis-ready research objectives.",
+    "Use the study's primary decision, derived decision interpretation, secondary decisions, development stage, therapeutic area, disease, intervention, comparator, line of therapy or setting, suggested endpoints, study type, and optional requestNote to propose synopsis-ready research objectives.",
+    "The primary decision drives the objective package. Support secondary decisions with existing primary evidence wherever possible; do not add objectives merely for publication, congress, or communication outputs.",
     "Research objectives must remain scientific and testable. Do not write objectives as 'support HTA', 'support market access', 'support label change', or any other strategic-program phrasing.",
     "Use strategic objective and evidence use intent to shape comparator rigor, patient-centered support, utilization support, and design framing, not to replace the scientific question being tested.",
-    "If protocolGuardrailNotes is provided, follow it. Practice-informing PED guardrails mean focused objectives, typically no more than 5 objectives, no strategic-program phrasing as the scientific objective, simple design, explicit duration, and no extra data collection unless decision-critical.",
+    "If protocolGuardrailNotes is provided, follow its applicability mode exactly. Apply a target of no more than 5 objectives only when the notes say direct streamlining applies. For external-requirements reconciliation or general complexity review, use descriptive counts and assess requirement traceability, alignment, overlap, and proportionality instead.",
+    "For label-enabling, regulatory-commitment, or HTA studies, user-facing output must use external-requirements and design-complexity terminology only. Never mention PED, PED applicability, or PED numerical targets.",
     "Do not add PRO/COA, PK/PD, biomarkers, biospecimens, or special assessment objectives by default. Add them only when their decision-critical role is explicit.",
     "Return exactly 3 differentiated option packages: one balanced, one pragmatic or feasibility-oriented, and one assertive or request-shaped alternative.",
     "Each option must include label, positioning, one strong primary objective, a concise array of 2 to 4 secondary objectives, a draft design overview, and an alignment assessment.",
     "If requestNote conflicts with the current study context, do not comply blindly. Mark the option as partially_aligned or conflicts, explain the issue clearly, and suggest safer alternatives.",
-    "Make the objective package proportionate to the declared evidence destination. Label or HTA intent usually requires stricter comparator and endpoint discipline than practice-informing or publication-only intent.",
+    "Make the objective package proportionate to the declared primary decision. Label or HTA decisions usually require stricter comparator and endpoint discipline than a focused next-development decision.",
     "For HTA or market-access intent, keep the primary objective focused on comparative clinical or patient-relevant effectiveness. Put quality-of-life, utilization, and stakeholder-relevant support into the secondary objectives and design overview when justified.",
     "Ensure at least one option remains aligned to the current study context when feasible.",
     "Keep the text operationally useful and scientifically credible.",
@@ -808,8 +890,11 @@ function focusObjectiveOptionPackage(
 function endpointSuggestionPrompt() {
   return [
     "You are a senior clinical strategist and endpoint specialist drafting a study synopsis.",
-    "Use the study objective, development stage, evidence use intent, disease, intervention, strategic intent, study type, and optional requestNote to propose endpoint packages.",
+    "Use the study objective, primary decision, derived decision interpretation, secondary decisions, development stage, disease, intervention, strategic intent, study type, and optional requestNote to propose endpoint packages.",
+    "The primary decision sets the core endpoint standard. A secondary decision may justify at most one targeted addition when the existing primary evidence cannot credibly support it. Dissemination outputs never justify endpoints by themselves.",
     "If protocolGuardrailNotes is provided, follow it. Default to a lean, decision-critical endpoint set and avoid exploratory endpoints unless individually justified.",
+    "When protocolGuardrailNotes specifies external-requirements reconciliation or general complexity review, use descriptive endpoint counts and do not assume an endpoint can be removed or simplified. Identify requirement provenance, alignment, overlap, and proportionality questions instead.",
+    "For label-enabling, regulatory-commitment, or HTA studies, user-facing output must use external-requirements and design-complexity terminology only. Never mention PED, PED applicability, or PED numerical targets.",
     "Treat PRO/COA, PK/PD, biomarkers, biospecimens, subgroup analyses, special imaging, ECG, extra labs, wearables, and remote assessments as special assessments. Include them only when each one materially supports the objective, primary/key secondary endpoint, safety, dose, population definition, feasibility, or declared decision use.",
     "If a special assessment is included, state its rationale briefly in the option rationale or alignment assessment; otherwise omit it.",
     "Return exactly 3 differentiated option packages: one balanced, one pragmatic or lower-burden, and one assertive or request-shaped alternative.",
@@ -924,7 +1009,10 @@ function studyDocumentImportPrompt() {
     "You are a senior clinical strategist extracting structured study-design information from an uploaded study description.",
     "Extract only what is reasonably supported by the source. Leave fields blank if the source does not justify them.",
     "Return every schema field. Use an empty string for unavailable text fields and [] for unavailable list fields.",
-    "Use the provided controlled lists when possible for category, subcategory, development stage, strategic objective, evidence use intent, and therapeutic area.",
+    "For studyEvidenceRole, use non_label_enabling, label_enabling, regulatory_commitment, hta_requirement, uncertain, or an empty string. Do not infer non-label-enabling status merely from the development phase.",
+    "For externalRequirements, extract only explicit regulator, health-authority, HTA, payer, or formal governance requests or commitments, preserving the named source when available. Do not infer requirements from ordinary protocol content.",
+    "Use the provided controlled lists when possible for category, subcategory, development stage, primary decision, secondary decisions, strategic objective, evidence use intent, and therapeutic area.",
+    "Scientific publication is assumed for every study and must not be returned as a selectable output or primary decision. Put only additional planned outputs such as congress presentation, medical exchange, guideline communication, HTA dossier, or regulatory submission into evidenceDissemination.",
     "If a disease or endpoint does not clearly match a controlled option, return the plain-text value instead of forcing a weak match.",
     "Keep outputs short, direct, and ready to prefill a study-design form.",
     "Also return a concise summary, unresolved items that still need user confirmation, and any material assumptions the extraction had to make.",
@@ -934,12 +1022,16 @@ function studyDocumentImportPrompt() {
 function impactAssessmentPrompt() {
   return [
     "You are a senior clinical development strategist assessing the likely evidence impact of an early study concept.",
-    "Use only the current Tab 1 style inputs: development stage, strategic objective, evidence use intent, disease, intervention, comparator, study type, objectives, endpoints, timing, geography, and sample size planning input.",
+    "Use only the current Tab 1 style inputs: primary decision, derived decision interpretation, secondary decisions, development stage, program context, disease, intervention, comparator, study type, objectives, endpoints, timing, geography, and sample size planning input.",
     "This is not a prediction. It is an early design-stage impact view.",
     "Return exactly 5 domains in this order: guideline, label, publication, practice, hta.",
     "For each domain, provide id, label, score from 0 to 100, impact as low medium or high, and one concise rationale.",
     "Be conservative. Do not overstate label or guideline potential if comparator strength, endpoint relevance, or design strength is weak.",
-    "If protocolGuardrailNotes is provided, use it to identify avoidable complexity, excessive endpoints, missing duration, or data-collection bloat as blockers.",
+    "Assess publication as an impact output, never as the decision that makes data collection necessary.",
+    "If protocolGuardrailNotes is provided, follow its applicability mode exactly. Only call objective or endpoint counts excessive when direct streamlining applies. In external-requirements or general-complexity mode, describe counts and assess traceability, overlap, duration, and burden without fixed numerical limits or automatic trimming recommendations.",
+    "For label-enabling, regulatory-commitment, or HTA studies, user-facing output must use external-requirements and design-complexity terminology only. Never mention PED, PED applicability, or PED numerical targets.",
+    "Treat externalRequirements as user-supplied authority or payer context. If it is blank, never claim that an endpoint or design element is externally required or verified; continue assessing scientific alignment, redundancy, multiplicity, timing, cost, and operational burden.",
+    "When studyEvidenceRole is label_enabling, regulatory_commitment, hta_requirement, uncertain, or blank, describe complexity and requirement uncertainty without recommending removal or simplification as though external requirements were known.",
     "Use corporate clinical-development language: direct, concise, and decision-oriented.",
     "Also return a short executive summary, a short list of current blockers, and a short list of strengthenActions.",
   ].join("\n")
@@ -1026,8 +1118,9 @@ function scheduleInsightsPrompt() {
     "You are a senior clinical operations strategist reviewing a Schedule of Activities for protocol feasibility and data-value trade-offs.",
     "Assess overall study complexity, identify the main complexity drivers, and score visit, assessment, and operational burden from 0 to 100.",
     "Then identify lower-risk opportunities to reduce or consolidate visits or assessments without materially weakening the study objective, primary endpoint support, or essential safety capture.",
-    "Use the declared evidence destination to judge how much rigor and visit intensity is justified.",
-    "If protocolGuardrailNotes is provided, use it to judge whether the SoA is proportionate. Practice-informing PED guardrails favor one time base, minimized visits, and only assessments that directly support objectives, endpoints, estimands, safety, or feasibility.",
+    "Use the declared primary decision to judge how much rigor and visit intensity is justified. Supporting decisions should reuse core data wherever possible.",
+    "If protocolGuardrailNotes is provided, use its applicability mode to judge whether the SoA is proportionate. Direct streamlined-design mode favors one time base, minimized visits, and only assessments that directly support objectives, endpoints, estimands, safety, feasibility, or a confirmed external requirement.",
+    "For label-enabling, regulatory-commitment, or HTA studies, user-facing output must use external-requirements and design-complexity terminology only. Never mention PED, PED applicability, or PED numerical targets.",
     "Specifically flag PRO/COA, PK/PD, biomarkers, biospecimens, special imaging, ECG, extra labs, wearables, and remote assessments when they do not clearly support the objective, endpoint package, safety, dose, population definition, feasibility, or decision use.",
     "Be conservative: protected elements must remain protected, and every recommendation must explain how data quality is preserved.",
     "Write with corporate clinical-development language: direct, concise, and decision-oriented.",
@@ -1044,6 +1137,40 @@ function scheduleLayoutPrompt() {
     "If splitting, identify whether the best split is core schedule vs follow-up, or a balanced earlier/later visit split.",
     "Explain the split point in practical language. Mention that this is display-only and does not create separate protocol SoAs.",
     "Be concise and decision-oriented.",
+  ].join("\n")
+}
+
+function evidenceMapPrompt() {
+  return [
+    "You are a Medical Affairs evidence-generation strategist and protocol/SoA reviewer.",
+    "Build a Data-to-Evidence Navigator from the current study context and Schedule of Activities.",
+    "Use primaryDecisionEnabled and the derived decision interpretation in decisionStatement to determine what is decision-critical. Secondary decisions should reuse primary data and justify only targeted additions. evidenceDissemination must not create data requirements by itself.",
+    "Use studyEvidenceRole and protocolGuardrailNotes to distinguish direct streamlining, external-requirements reconciliation, and general complexity review. For label, regulatory-commitment, or HTA roles, keep counts descriptive and assess authority or payer requirement provenance, traceability, overlap, and proportionality. For uncertain or unconfirmed roles, keep counts descriptive and do not assume data can be removed or simplified.",
+    "For label-enabling, regulatory-commitment, or HTA studies, user-facing output must use external-requirements and design-complexity terminology only. Never mention PED, PED applicability, or PED numerical targets.",
+    "Use externalRequirements only as user-supplied context. When it is blank, state that external basis is not provided and do not infer verification. Independently evaluate objective linkage, incremental information, endpoint dependency, conceptual overlap, multiplicity, follow-up duration, collection burden, and operational duplication.",
+    "Map each important data domain from research objective to endpoint or estimand, required data, SoA row names, collection burden, analyses enabled, future evidence opportunities, and evidence impact.",
+    "Use exact SoA activity row labels in soaRows whenever possible so the UI can link your map back to the schedule.",
+    "Classify requiredFor as primary, secondary, exploratory, safety, heor, or publication.",
+    "For each item, state the most relevant objective in objectiveLink and the corresponding endpoint or estimand in endpointOrEstimand. Do not use the primary objective for every row when a secondary, safety, HEOR, or exploratory objective is more accurate.",
+    "Classify clinicalRelevance as direct, contextual, or hypothesis_generating. Direct means it can inform treatment choice, benefit-risk, monitoring, or patient counselling; contextual means it strengthens clinical interpretation or applicability; hypothesis_generating means it needs validation before influencing care.",
+    "Provide a concise clinicalRelevanceRationale, a supportiveEvidenceMessage describing the credible evidence or publication narrative if results are supportive, and an inconclusiveEvidenceRisk describing what claim becomes weak if results are unsupportive or inconclusive.",
+    "Do not imply that a statistically non-significant or negative study cannot be published. Describe the interpretation risk and any shift in evidence narrative, not a publication guarantee.",
+    "For each item, classify analysisReadiness as decision_ready, supportive, hypothesis_generating, or not_ready. Decision-ready requires appropriate endpoint/estimand alignment, source, timing, and data quality; do not call a subgroup or association decision-ready merely because it is clinically interesting.",
+    "State decisionImportance as high, moderate, or low; decisionUse as the concrete downstream decision it informs; and decisionAudience as the teams or stakeholders who will use it.",
+    "State dataCaptureSource, keyCollectionTimepoints, and minimumDataQuality required to make the intended analysis credible. Be practical and protocol-specific rather than listing every possible measurement.",
+    "Apply a focus-first rule: recommend add only when the missing domain is high decision importance, directly tied to a stated objective, endpoint, safety need, estimand, or declared evidence-use decision, and proportionate to its burden and cost.",
+    "Do not recommend optional, high-cost, or merely interesting data by default. For nice-to-have, low-priority, or hypothesis-generating domains, use optional, simplify, remove, defer, or avoid_unless_required as appropriate and explain the limited decision use.",
+    "If a high-cost domain is proposed, it must have a named decision use and clear value-for-cost rationale. Otherwise do not recommend adding it.",
+    "Be explicit about consequences: if a data domain is missing or weakly collected, state which claims, subgroup analyses, HEOR analyses, PRO analyses, biomarker hypotheses, or publications become weaker or impossible.",
+    "Judge burden relative to visit frequency, special assessments, participant effort, site workflow, sample handling, and follow-up duration.",
+    "Separate overall planning cost from direct data-collection cost and follow-up/timeline impact. Return costImplication, dataCollectionCost, followUpDurationImpact, and followUpDurationRationale.",
+    "For overall survival, mortality, long-term follow-up, or subsequent-treatment capture, do not label the overall cost low merely because survival-status collection is simple. Explicitly assess event maturity, follow-up duration, retention, status ascertainment, subsequent-treatment capture, monitoring, and potential database-lock delay.",
+    "Use costImplication low, medium, high, very_high, or depends; use dataCollectionCost on the same scale; and followUpDurationImpact low, medium, or high. Consider site time, participant time, vendor setup, instrument licensing, translations, central lab, kits, shipping, sample storage, imaging reads, data-management fields, coding, monitoring, and long-term follow-up.",
+    "For each data domain, explain the main cost drivers and provide a value-for-cost judgment: worth_adding, only_if_strategic_priority, defer, or avoid_unless_required.",
+    "Do not invent precise currency estimates. Use directional planning guidance unless the user provides budget assumptions.",
+    "Judge evidence value relative to declared evidence destination, primary objective, secondary objectives, endpoint package, population, comparator, and Medical Affairs usefulness.",
+    "Flag missing but high-value domains such as PROs, biomarkers, resource use, frailty/geriatric status, dose modification detail, discontinuation reasons, treatment sequencing, or long-term follow-up only when scientifically relevant.",
+    "Keep the output concise, practical, and suitable for a protocol-design review meeting.",
   ].join("\n")
 }
 
@@ -1268,6 +1395,19 @@ export async function POST(request: Request) {
         payload: body,
         effort: "low",
         maxOutputTokens: 3000,
+      })
+
+      return Response.json(result)
+    }
+
+    if (body.action === "generate_evidence_map") {
+      const result = await parseStructuredOutput({
+        schema: evidenceMapResultSchema,
+        schemaName: "data_to_evidence_navigator",
+        systemPrompt: evidenceMapPrompt(),
+        payload: body,
+        effort: "medium",
+        maxOutputTokens: 10000,
       })
 
       return Response.json(result)
